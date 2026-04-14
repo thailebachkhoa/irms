@@ -12,13 +12,12 @@ export function useTables() {
     const [tables, setTables] = useState<Table[]>([]);
 
     useEffect(() => {
-        const fetch = () =>
+        const fetchTables = () =>
             api.get<Table[]>('/tables').then(r => setTables(r.data)).catch(console.error);
 
-        fetch();
-        const id = setInterval(fetch, 3000);
+        fetchTables();
+        const id = setInterval(fetchTables, 3000);
         return () => clearInterval(id);
     }, []);
-
     return { tables };
 }

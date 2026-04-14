@@ -6,6 +6,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { analyticsApi } from '../services/analyticsApi';
 import { useAuth } from '../context/AuthContext';
+import { jwtDecode } from 'jwt-decode';
+import type { AuthPayload } from '../types';
 
 export function LoginPage() {
     const [username, setUsername] = useState('');
@@ -26,13 +28,13 @@ export function LoginPage() {
     const submit = async () => {
         try {
             const { token } = await analyticsApi.login(username, password);
-            login(token);
-            // Redirect dựa vào role trong token
-            // Bằng:
-            login(token); // login() trong AuthContext đã decode rồi
-            const { user } = useAuth(); // nhưng state chưa update ngay
-        } catch { setError('Sai tên đăng nhập hoặc mật khẩu'); }
-    };
+            const decoded = jwtDecode<AuthPayload>(token); // decode trước
+            login(token);                                   // gọi 1 lần
+            navigate(roleDefaultRoute[decoded.role] ?? '/login'); // navigate
+        } catch {
+            setError('Sai tên đăng nhập hoặc mật khẩu');
+        }
+    }
 
     return (
         <div style={{

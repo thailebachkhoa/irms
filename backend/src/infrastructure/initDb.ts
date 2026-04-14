@@ -182,7 +182,31 @@ async function initDb() {
         ('Đường',       3000,  'g',   300)
       ON CONFLICT (name) DO NOTHING;
     `);
+    // Seed dishes
+    await client.query(`
+  INSERT INTO dishes (id, name, category, cooking_method) VALUES
+    ('d0000001-...', 'Gà chiên Hàn Quốc', 'mặn', 'chiên'),
+    ('d0000002-...', 'Cơm trắng', 'mặn', 'hấp'),
+    ...
+  ON CONFLICT (id) DO NOTHING;
+`);
 
+    // Seed combo_dishes (combo ↔ dish)
+    await client.query(`
+  INSERT INTO combo_dishes (combo_id, dish_id) VALUES
+    ('a1b2c3d4-...-000000000001', 'd0000001-...'), -- Combo Gà → Gà chiên
+    ...
+  ON CONFLICT DO NOTHING;
+`);
+
+    // Seed dish_ingredients (dish ↔ ingredient)
+    await client.query(`
+  INSERT INTO dish_ingredients (dish_id, ingredient_name, qty_needed, unit) VALUES
+    ('d0000001-...', 'Gà', 0.3, 'kg'),
+    ('d0000001-...', 'Dầu ăn', 200, 'ml'),
+    ...
+  ON CONFLICT DO NOTHING;
+`);
     console.log('[InitDB] ✅ Done! Default accounts:');
     console.log('  admin   / admin123');
     console.log('  manager / manager123');

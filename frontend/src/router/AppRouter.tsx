@@ -14,7 +14,7 @@ import { AdminPage } from '../pages/AdminPage';
 import type { Role } from '../types';
 
 // HOC bảo vệ route — chỉ cho vào nếu có đúng role
-function Guard({ roles, children }: { roles: Role[]; children: JSX.Element }) {
+function Guard({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
     const { user } = useAuth();
     if (!user) return <Navigate to="/login" replace />;
     if (!roles.includes(user.role)) return <Navigate to="/login" replace />;

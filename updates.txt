@@ -1,0 +1,12 @@
+ver 3:
+
+danger: 
+1. frontend/src/pages/LoginPage.tsx — Nhiều lỗi cùng lúc
+2. backend/src/infrastructure/initDb.ts — Thiếu seed data quan trọng
+
+mid:
+3: FE package.json -> package-lock.json
+4: fe appRouter.tsx
+5: iventory/index.ts be -> ???
+6: useTables.ts 
+7. // src/infrastructure/eventBus.ts -> đúng nhưng mở rộng nguy hiểm
