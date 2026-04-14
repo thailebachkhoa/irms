@@ -23,3 +23,164 @@ npm run db:init
 
 # 6. Chạy server
 npm run dev
+
+
+Hệ thống Quản lý Nhà hàng Thông minh (IRMS): 
+
+UI: 
+https://stitch.withgoogle.com/projects/12545105788907448595?pli=1
+
+Stake-holders: ( xem luồng event-driven để biết liên quan ntn )
+
+Manager:
+ Server: 
+Chief: 
+Casher: 
+Hệ thống thanh toán:
+admin: 
+
+Yêu cầu phi chức năng: 
+Phân tích các đặc điểm kiến trúc dựa trên context assignment. 
+Hiệu suất: Xử lý đơn hàng và cập nhật màn hình bếp, meunu ngay lập tức (thời gian thực). Khả năng chịu tải là sống còn, đặc biệt xử lí peak-hours ( đòi hỏi khả năng đa luồng tốt ). Speed và through-put được ưu tiên hơn memory
+Khả năng mở rộng: yêu cầu phải tốt và đáp ứng solid
+Độ tin cậy: Hoạt động liên tục trong giờ kinh doanh, không làm mất dữ liệu đơn hàng khi có sự cố. Khả năng đáp ứng giờ cao điểm và số lượng khách hàng đặt bàn lớn.Đặc biệt, không thể sập dây chuyền. 
+Tính dễ sử dụng: Giao diện trực quan, yêu cầu tối thiểu.
+Bảo mật: Xử lý an toàn dữ liệu thanh toán và kiểm soát truy cập chặt chẽ, đặc biệt phải đảm bảo role-access cẩn thận
+Tính tương thích: chạy được trên các thiết bị khác nhau, 
+
+Chương trình này sẽ ưu tiên khả năng mở rộng ( để làm rõ ứng dụng solid ) và độ tin cậy. 
+
+ So sánh và Lựa chọn Kiến trúc Hệ thống:
+Để hỗ trợ khả năng ở rộng và độ tin cậy, các kiểu kiến trúc sau đã được xem xét:
+2.1 Các phong cách kiến trúc tiềm năng 
+Dựa theo kiến thức đã được học, kiến trúc phần mềm được chia làm 2 nhánh chính: monolithic và distributed
+Tuy nhiên, monolithic ngay từ định nghĩa mono ( duy nhất ) đã vi phạm quy tắc S ( single responbility ) và D - dependance độc lập các modules nên các biến thể của distributed architect được lựa chọn. Tuy nhiên, kiến trúc service-oriented sẽ bị loại vì kém độc lập bởi triết lí smart pipes, dumb endpoints đã đẩy hệ thống phụ thuộc vào trục trung tâm service bus ( độ tin cậy sẽ kém đi )
+theo context của assignement: “ The system relies on digital interfaces, shared databases, and software-driven logic to manage activities “.
+
+	Đánh giá cá nhân: "Trong 5 kiểu kiến trúc phân tán, em nhận thấy Service-based kết hợp với tư duy Event-driven là giải pháp tối ưu nhất cho hệ thống quản lý nhà hàng. Nó giúp hệ thống đạt được sự cân bằng giữa yêu cầu software-driven logic (nhờ Event-driven) và Độ phức tạp thấp cùng tốt hơn (nhờ Service-based với Database tập trung ), đồng thời cũng phù hợp yêu cầu “shared database” thứ microservices và space-based không làm được." 
+2.2 Kiến trúc được lựa chọn: Hybrid (Hỗn hợp )
+Khung kiến trúc cốt lõi là service-based, các services liên kết với nhau qua kiến trúc event-driven.  
+-> kiến trúc layered khi code hệ thống con / service con ( đảm bảo chặt chẽ theo chiều dọc khi hệ thống service-based đã ổn định theo chiều ngang )
+-> service-based - layer
+
+
+
+
+
+
+
+
+
+
+
+
+
+2. Đi sâu hơn moudule-view ( thiết kế thư mục cho kiến trúc service-based )
+Dựa trên Scope, chúng ta chia IRMS thành 6 module hay component chính. Mỗi module này sẽ được thiết kế như một đơn vị độc lập để dễ bảo trì. ( các component được thiết kế dạng layer )
+
+—-------------------------------------- phân tích logic code —----------------------------
+1. Module Quản lý Order & Menu (Core)
+stakeholders chính: server
+role chính: tạo ra gói thông tin order để back-staff hoạt động.
+mô tả luồng công việc: 
+( trích từ assignment ) 
+● Orders include special instructions, allergy notes, combo selections, and customizations.  
+( tiền logic, thông tin cho db )
+giả dụ nhà hàng chỉ bán combo: 1 order gồm: tên combo / id, số lượng đặt, ghi chú đặt biệt từ khách hàng ( notes ví dụ nội dung:  tùy chỉnh cách nấu ăn cho đầu bếp như bớt muối, ghi chú dị ứng, .. ), tổng tiền ( mỗi combo có giá tiền riêng, tổng tiền = giá tiền * số lượng ), trạng thái nấu , số bàn-> lưu ý: gói thông tin order này sẽ được chạy rất nhiều nơi ( tuy nhiên, việc upgrade order sẽ ưu tiên sau )
+vd: order ( gà hàn quắc / 2002, 2, “không cay”, 10 000 * 2, “chưa nấu”, 001  )
+Trong đó, tên combo và giá tiền là do admin quản lí.  -> lưu ý: giả dụ nước ngọt, ăn ướt đều trong dịch vụ của nhà hàng ( lát mở rộng và chỉnh sửa sau )
+meunu gồm list combo: tên combo, giá tiền, trạng thái khả dụng ( có thông báo từ hệ thống kho nguyên liệu s5 khi nguyên liệu không đủ nấu, “update real time” )
+vd: 
+gogi / 123, 130 000, còn hàng
+gói trẻ em khuyến mãi / 323, 200 000, hết hàng
+ví dụ cho logic hết hàng: không nghĩ nhiều, event-bus sẽ kéo <run-out> về update lại trạng thái hết hàng
+( xử lí )
+phục vụ tạo một order,
+( event-driven )
+hệ thống đóng gói thông tin <order> gửi event-bus có “new-order” cho kitchen s2, và cho phục vụ s3, gửi kho nguyên liệu s5 tự động trừ số nguyên liệu cần thiết ( lát sẽ đề cập sau )
+tiếp nhận thông tin “run-out” từ s5 để cập nhập trạng thái khả dụng cho meunu
+
+( table update cho server khi kds xong món ăn sẽ được đề cập sau ) 
+
+2. Module Kitchen Display System (KDS)
+main stakeholders: chief
+Chức năng: Nhận đơn từ Server ( cụ thể từ module order số 1 ) , phân loại món vào các Station (Grill, Fryer…  ), quản lý thời gian chờ, phân loại món ăn, thông báo “new-order” hoặc sát deadline
+( tiền xử lí, thông tin db )
+trong db, dựa vào tên combo / id -> truy xuất list món ăn và thời gian nấu ( là hằng số do admin chọn )
+vd: combo gà phá lấu / id 231 -> truy xuất được rau muống tào tỏi ( món ăn ), muối ( món ăn ), 45p ( thời gian ) -> tất cả chưa cho manager chỉnh sửa, nằm trong mẫu db. 
+món ăn gồm: tên món ăn / id món ăn, phân loại món ăn ( ngọt, mặn, á âu ), cách chế biến ( nướng xà rán ), <tên nguyên liệu, số lượng cần để nấu, đơn vị> - lát đề cập sau. Db món ăn cũng do admin làm sample lưu sẵn trong db.  
+vd: rau muốn xào tỏi / id 002, ngọt, xào -> 
+< rau muống, 1, bó > 
+< dầu ăn, 500, ml >
+(  logic chính ) 
+thông qua event-bus, “new-order” được tiếp nhận và để đơn giản hóa trạng thái nấu ăn chỉ có: started và done
+( event - driven )
+khi nấu xong, họ thủ công cập nhập trạng thái combo: done -> event driven phát loa cho casher trong hệ thống billing s4, phục vụ s3. 
+nguyên cái order được cập nhập lun. ( sẽ chấp nhận hạn chế dư thừa dữ liệu ) vd: order
+bếp chỉ nhận từ s1 cái new order.
+vd: order ( gà hàn quắc / 2002, 2, “không cay”, 10 000 * 2, “chưa nấu”, 001  ) -> đã nấu 
+( tính năng phụ - bỏ qua tính năng phụ, không làm )
+trang đầu bếp được list new-order combo mà tại đó họ có thể truy xuất list món ăn sẽ nấu 
+trang đầu bếp cũng có nofication riêng: 1 ngăn thể hiện new-order và 1 ngăn cảnh báo deadline sắp hết. 
+3. Module Table & Reservation (Sơ đồ bàn) → đây là module thứ yếu, không gây sập dây chuyền hệ thống
+top staker holders: manager / kiêm host, phục vụ 
+( trong hệ thống này, chưa thực hiện tính năng: đặt bàn trước do stakeholders manager )
+( tiền xử lí )
+phục vụ được một list các bàn ( theo số bàn ), trạng thái của bàn ( nhận từ gói new-order từ s1  ), thời gian còn lại cho bàn trống tiếp theo ( thời gian nấu đã nêu trong tiền mô tả kds số 2 + thời gian trung bình ăn là 90p )
+vd: bàn 001, “đã nấu”/”chưa nấu”/”trống” ( thích thiết kế yes/no boolean ok ), 45p + 90p 
+cập nhập thông tin liên tục từ s1 và s2 về cái order, 
+( event - driven )
+nhận thông tin từ s1 < new-order> và s2 <done> để cập nhập trạng thái bàn
+nhận thông tin từ s4 <payed> để xóa trạng thái về trống
+( mục đích )
+cho phục vụ / server có thể cập nhập trạng thái bàn để phục vụ khách. 
+lưu ý: trống là setup mặc định hoặc từ billings
+
+4. Module Billing & Payment (Thanh toán)
+Chức năng: Thanh toán hóa đơn ( các tính năng mở rộng sẽ làm sau )
+Liên kết: Sau khi thanh toán thành công, nó gửi lệnh cập nhật doanh thu và trừ kho và cập nhập trạng thái bàn. 
+(event-driven)
+nhận thông tin từ s2 kitchen về order đã nấu xong và có tổng tiền thanh toán
+gửi thông gói <payed> cho s6 và s3 ( tính doanh thu và cập nhập trạng thái bàn )
+( logic )
+tạo trang quét mã qr hoặc cash thanh toán
+casher xác nhận payed 
+( mở rộng )
+dựa vào order sau này xuất bills sau, thêm tính năng tips
+
+5. Module Inventory (Kho & Nguyên liệu)
+Chức năng: Theo dõi lượng tồn kho, cảnh báo khi nguyên liệu sắp hết (Threshold alerts).
+đề cập lại
+món ăn gồm: tên món ăn / id món ăn, phân loại món ăn ( ngọt, mặn, á âu ), cách chế biến ( nướng xà rán ), <tên nguyên liệu, số lượng cần để nấu, đơn vị> - lát đề cập sau. Db món ăn cũng do admin làm sample lưu sẵn trong db.  
+vd: rau muốn xào tỏi / id 002, ngọt, xào -> 
+< rau muống, 1, bó > 
+< dầu ăn, 500, ml >
+kho nguyên liệu gồm: tên nguyên liệu, số lượng và đơn vị tính -> cập nhập thủ công qua dabase ( viết một list trong db, con số cố định )
+vd: rau muống, 10000 ( update qua ui ), bó
+( logic )
+manger updates số lượng thui
+( event-driven ) 
+gửi s1 khi “run-outl”: đây là tình trạng khi số lượng của tên nguyên liệu rơi dưới mốc đã tính toán ( assignment ghi là ⅓ predefined ) -> mốc này cứ lấy thật to vào.
+nhận từ s1 “new-order” thì trừ tự động số lượng nguyên liệu tương ứng với combo. 
+vd: vd: order ( gà hàn quắc / 2002, 2, “không cay”, 10 000 * 2, “chưa nấu”, 001  ) -> đã nấu 
+gà hàn quắc -> rau muống, 4*2
+kho tự trừ rau-muống 100-4
+điểm yếu chết người hệ thống là: order yêu cầu số lượng combo lớn, vượt qua khả năng đáp ứng kho nguyên liệu thì vẫn phải nấu. lỗi này chấp nhận và setup mặc định = 0
+
+6. Module Analytics & Admin (Quản trị) - độc lập nhất
+( logic )
+khi tạo tài khoản, admin là người chỉnh sửa trực tiếp trong db các request và tạo tài khoản đồng thời phân quyền cho người đăng kí ( role control theo assignment nè ). role nào thì xem stakeholders.
+manager cập nhập được doanh thu 
+( theo assignment thì nhiều lắm, để giảm tải cho ae cũng như hệ thống này không quá cốt lõi, chỉ lấy tính toán doanh thu. manger còn chỉnh thông tin meunu, giá tiền, mấy cái này mình cứ sample vài mẫu cố định trên db khỏi cho manager chỉnh sửa )
+event-driven: nhận thông tin từ bills 
+ui: nhấn nút tổng hợp doanh thu ngày -> có một list doanh thu theo ngày 
+
+
+notes điểm trừ hệ thống:
+điểm trừ: khách hàng chưa có đặt hàng trước, hệ thống gửi thông tin sai không thể sửa
+
+
+
+
+
+

@@ -38,10 +38,10 @@
 //  │   │   ├── router/AppRouter.tsx
 //  │   │   ├── App.tsx
 //  │   │   └── main.tsx
+//  |   |   |- vite-env.d.ts
 //  │   ├── package.json
 //  │   └── vite.config.ts
 //  |   ├── .env
-//  |   └── index.html
 //  |   ├── package-lock.json
 //  | 
 //  │
@@ -63,6 +63,1026 @@
 // FRONTEND
 // ════════════════════════════════════════════════════════════
 
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/components/BillPanel.tsx
+// Thu ngân tìm hóa đơn theo bàn, xác nhận thanh toán
+// ────────────────────────────────────────────────────────────
+import { useState } from 'react';
+import { useBilling } from '../hooks/useBilling';
+
+export function BillPanel() {
+    const { bill, loading, fetchBill, pay } = useBilling();
+    const [tableInput, setTableInput] = useState('');
+
+    return (
+        <div style={{ maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Tìm hóa đơn */}
+            <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                    placeholder="Số bàn..."
+                    value={tableInput}
+                    onChange={e => setTableInput(e.target.value)}
+                    style={{ flex: 1, padding: 8, borderRadius: 6, border: '1px solid #ddd' }}
+                />
+                <button
+                    onClick={() => fetchBill(tableInput)}
+                    style={{
+                        padding: '8px 16px', background: '#2c3e50',
+                        color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer'
+                    }}
+                >
+                    Tìm
+                </button>
+            </div>
+
+            {loading && <div>Đang tải...</div>}
+
+            {/* Hiển thị hóa đơn */}
+            {bill && (
+                <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
+                    <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 8 }}>
+                        Hóa đơn bàn {bill.tableId}
+                    </div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: '#2c3e50', marginBottom: 16 }}>
+                        {bill.totalAmount.toLocaleString('vi-VN')} đ
+                    </div>
+                    <div style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
+                        Trạng thái: {bill.status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                    </div>
+
+                    {bill.status === 'pending' && (
+                        <button
+                            onClick={() => pay(bill.id)}
+                            style={{
+                                width: '100%', padding: 12, background: '#27ae60',
+                                color: '#fff', border: 'none', borderRadius: 8,
+                                fontSize: 16, fontWeight: 500, cursor: 'pointer',
+                            }}
+                        >
+                            Xác nhận thanh toán
+                        </button>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/components/KitchenBoard.tsx
+// Hiển thị danh sách ticket theo cột trạng thái
+// ────────────────────────────────────────────────────────────
+import { useKitchen } from '../hooks/useKitchen';
+
+export function KitchenBoard() {
+    const { tickets, startCooking, markDone } = useKitchen();
+
+    const pending = tickets.filter(t => t.status === 'pending');
+    const cooking = tickets.filter(t => t.status === 'cooking');
+
+    const cardStyle = {
+        padding: 12, border: '1px solid #ddd', borderRadius: 8,
+        background: '#fff', marginBottom: 8,
+    };
+
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+            {/* Cột: Chờ nấu */}
+            <div>
+                <h3 style={{ color: '#e67e22' }}>Chờ nấu ({pending.length})</h3>
+                {pending.map(t => (
+                    <div key={t.id} style={cardStyle}>
+                        <div style={{ fontWeight: 500 }}>Bàn {t.tableId}</div>
+                        <div>{t.quantity}x {t.comboName}</div>
+                        {t.notes && <div style={{ color: '#666', fontSize: 13 }}>"{t.notes}"</div>}
+                        <button
+                            onClick={() => startCooking(t.id)}
+                            style={{
+                                marginTop: 8, padding: '6px 12px', background: '#e67e22',
+                                color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer'
+                            }}
+                        >
+                            Bắt đầu nấu
+                        </button>
+                    </div>
+                ))}
+            </div>
+
+            {/* Cột: Đang nấu */}
+            <div>
+                <h3 style={{ color: '#27ae60' }}>Đang nấu ({cooking.length})</h3>
+                {cooking.map(t => (
+                    <div key={t.id} style={cardStyle}>
+                        <div style={{ fontWeight: 500 }}>Bàn {t.tableId}</div>
+                        <div>{t.quantity}x {t.comboName}</div>
+                        {t.notes && <div style={{ color: '#666', fontSize: 13 }}>"{t.notes}"</div>}
+                        <button
+                            onClick={() => markDone(t.id)}
+                            style={{
+                                marginTop: 8, padding: '6px 12px', background: '#27ae60',
+                                color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer'
+                            }}
+                        >
+                            Xong món
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/components/MenuGrid.tsx
+// Hiển thị toàn bộ menu, highlight combo hết hàng
+// ────────────────────────────────────────────────────────────
+import type { MenuItem } from '../types';
+
+type Props = {
+    menu: MenuItem[];
+    onSelect: (item: MenuItem) => void;
+};
+
+export function MenuGrid({ menu, onSelect }: Props) {
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+            {menu.map(item => (
+                <button
+                    key={item.id}
+                    disabled={!item.isAvailable}
+                    onClick={() => onSelect(item)}
+                    style={{
+                        padding: 16,
+                        opacity: item.isAvailable ? 1 : 0.4,
+                        border: '1px solid #ddd',
+                        borderRadius: 8,
+                        cursor: item.isAvailable ? 'pointer' : 'not-allowed',
+                        background: item.isAvailable ? '#fff' : '#f5f5f5',
+                    }}
+                >
+                    <div style={{ fontWeight: 500 }}>{item.name}</div>
+                    <div style={{ color: '#666', fontSize: 13 }}>
+                        {item.price.toLocaleString('vi-VN')} đ
+                    </div>
+                    {!item.isAvailable && (
+                        <div style={{ color: '#e74c3c', fontSize: 12 }}>Hết hàng</div>
+                    )}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/components/OrderForm.tsx
+// Form tạo đơn: chọn combo (từ MenuGrid) → nhập số bàn + ghi chú → submit
+// ────────────────────────────────────────────────────────────
+import { useState } from 'react';
+import { orderApi } from '../services/orderApi';
+import { MenuGrid } from './MenuGrid';
+import { useMenu } from '../hooks/useMenu';
+import type { MenuItem, CreateOrderDto } from '../types';
+
+export function OrderForm() {
+    const { menu, loading } = useMenu();
+    const [selected, setSelected] = useState<MenuItem | null>(null);
+    const [tableId, setTableId] = useState('');
+    const [quantity, setQuantity] = useState(1);
+    const [notes, setNotes] = useState('');
+    const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
+
+    const submit = async () => {
+        if (!selected || !tableId) return;
+        setStatus('loading');
+        try {
+            const dto: CreateOrderDto = {
+                tableId, comboId: selected.id, quantity, notes,
+            };
+            await orderApi.createOrder(dto);
+            setStatus('success');
+            // reset form
+            setSelected(null); setTableId(''); setQuantity(1); setNotes('');
+            setTimeout(() => setStatus('idle'), 2000);
+        } catch { setStatus('idle'); }
+    };
+
+    if (loading) return <div>Đang tải menu...</div>;
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <MenuGrid menu={menu} onSelect={setSelected} />
+
+            {selected && (
+                <div style={{ padding: 12, background: '#f0f9f4', borderRadius: 8 }}>
+                    <strong>Đã chọn:</strong> {selected.name} —{' '}
+                    {selected.price.toLocaleString('vi-VN')} đ
+                </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                    placeholder="Số bàn (vd: 001)"
+                    value={tableId}
+                    onChange={e => setTableId(e.target.value)}
+                    style={{ flex: 1, padding: 8, borderRadius: 6, border: '1px solid #ddd' }}
+                />
+                <input
+                    type="number" min={1} value={quantity}
+                    onChange={e => setQuantity(Number(e.target.value))}
+                    style={{ width: 70, padding: 8, borderRadius: 6, border: '1px solid #ddd' }}
+                />
+            </div>
+
+            <textarea
+                placeholder="Ghi chú (không cay, dị ứng...)"
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                rows={2}
+                style={{ padding: 8, borderRadius: 6, border: '1px solid #ddd' }}
+            />
+
+            <button
+                onClick={submit}
+                disabled={!selected || !tableId || status === 'loading'}
+                style={{
+                    padding: '10px 24px', borderRadius: 8, border: 'none',
+                    background: status === 'success' ? '#27ae60' : '#2c3e50',
+                    color: '#fff', cursor: 'pointer', fontWeight: 500,
+                }}
+            >
+                {status === 'loading' ? 'Đang gửi...' :
+                    status === 'success' ? 'Đã tạo đơn!' : 'Tạo đơn'}
+            </button>
+        </div>
+    );
+}
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/components/RevenueChart.tsx
+// Manager xem doanh thu ngày hôm nay
+// ────────────────────────────────────────────────────────────
+import { useState, useEffect } from 'react';
+import { analyticsApi } from '../services/analyticsApi';
+
+export function RevenueChart() {
+    const today = new Date().toISOString().slice(0, 10);
+    const [total, setTotal] = useState<number | null>(null);
+    const [date, setDate] = useState(today);
+
+    useEffect(() => {
+        analyticsApi.getDailyRevenue(date)
+            .then(d => setTotal(d.total))
+            .catch(console.error);
+    }, [date]);
+
+    return (
+        <div style={{ padding: 24, border: '1px solid #ddd', borderRadius: 12, maxWidth: 360 }}>
+            <div style={{ marginBottom: 12, fontSize: 14, color: '#666' }}>Doanh thu ngày</div>
+            <input
+                type="date" value={date}
+                onChange={e => setDate(e.target.value)}
+                style={{ padding: 6, borderRadius: 6, border: '1px solid #ddd', marginBottom: 16 }}
+            />
+            <div style={{ fontSize: 36, fontWeight: 700, color: '#2c3e50' }}>
+                {total === null ? '...' : `${total.toLocaleString('vi-VN')} đ`}
+            </div>
+        </div>
+    );
+}
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/components/TableMap.tsx
+// Hiển thị sơ đồ bàn với màu trạng thái
+// ────────────────────────────────────────────────────────────
+import { useTables } from '../hooks/useTables';
+import type { TableStatus } from '../types';
+
+const colorMap: Record<TableStatus, string> = {
+    available: '#27ae60',  // xanh lá — trống
+    occupied: '#e67e22',  // cam     — có khách, đang nấu
+    food_ready: '#2980b9',  // xanh    — món đã ra, chờ dọn
+};
+const labelMap: Record<TableStatus, string> = {
+    available: 'Trống',
+    occupied: 'Có khách',
+    food_ready: 'Món đã ra',
+};
+
+export function TableMap() {
+    const { tables } = useTables();
+
+    return (
+        <div>
+            {/* Legend */}
+            <div style={{ display: 'flex', gap: 16, marginBottom: 16, fontSize: 13 }}>
+                {Object.entries(colorMap).map(([status, color]) => (
+                    <span key={status} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{
+                            width: 12, height: 12, borderRadius: 2,
+                            background: color, display: 'inline-block'
+                        }} />
+                        {labelMap[status as TableStatus]}
+                    </span>
+                ))}
+            </div>
+
+            {/* Grid bàn */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+                {tables.map(table => (
+                    <div
+                        key={table.id}
+                        style={{
+                            padding: 16, borderRadius: 8, textAlign: 'center',
+                            background: colorMap[table.status],
+                            color: '#fff', fontWeight: 500,
+                        }}
+                    >
+                        <div style={{ fontSize: 18 }}>Bàn {table.tableNumber}</div>
+                        <div style={{ fontSize: 12, opacity: 0.85 }}>
+                            {labelMap[table.status]}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/context/AuthContext.tsx
+// JWT decode + lưu token + cung cấp user info toàn app
+// ────────────────────────────────────────────────────────────
+import React, { createContext, useContext, useState } from 'react';
+import { jwtDecode } from 'jwt-decode';
+import type { AuthPayload, Role } from '../types';
+
+type AuthCtx = {
+    user: AuthPayload | null;
+    token: string | null;
+    login: (token: string) => void;
+    logout: () => void;
+    hasRole: (...roles: Role[]) => boolean;
+};
+
+const AuthContext = createContext<AuthCtx>(null!);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+    const [token, setToken] = useState<string | null>(
+        () => localStorage.getItem('irms_token')
+    );
+    const [user, setUser] = useState<AuthPayload | null>(() => {
+        const t = localStorage.getItem('irms_token');
+        return t ? jwtDecode<AuthPayload>(t) : null;
+    });
+
+    const login = (newToken: string) => {
+        localStorage.setItem('irms_token', newToken);
+        setToken(newToken);
+        setUser(jwtDecode<AuthPayload>(newToken));
+    };
+
+    const logout = () => {
+        localStorage.removeItem('irms_token');
+        setToken(null);
+        setUser(null);
+    };
+
+    const hasRole = (...roles: Role[]) =>
+        user ? roles.includes(user.role) : false;
+
+    return (
+        <AuthContext.Provider value={{ user, token, login, logout, hasRole }}>
+            {children}
+        </AuthContext.Provider>
+    );
+}
+
+export const useAuth = () => useContext(AuthContext);
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/hooks/useBilling.ts
+// ────────────────────────────────────────────────────────────
+import { useState } from 'react';
+import { billingApi } from '../services/billingApi';
+import type { Bill } from '../types';
+
+export function useBilling() {
+    const [bill, setBill] = useState<Bill | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const fetchBill = async (tableId: string) => {
+        setLoading(true);
+        try {
+            const b = await billingApi.getBillByTable(tableId);
+            setBill(b);
+        } finally { setLoading(false); }
+    };
+
+    const pay = async (billId: string) => {
+        const paid = await billingApi.pay(billId);
+        setBill(paid);
+    };
+
+    return { bill, loading, fetchBill, pay };
+}
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/hooks/useKitchen.ts
+// Poll mỗi 3s — không cần WebSocket, đủ dùng cho nhà hàng nhỏ
+// ────────────────────────────────────────────────────────────
+import { useState, useEffect, useCallback } from 'react';
+import { kitchenApi } from '../services/kitchenApi';
+import type { KitchenTicket } from '../types';
+
+export function useKitchen() {
+    const [tickets, setTickets] = useState<KitchenTicket[]>([]);
+
+    const refresh = useCallback(() => {
+        kitchenApi.getActiveTickets().then(setTickets).catch(console.error);
+    }, []);
+
+    useEffect(() => {
+        refresh();
+        const id = setInterval(refresh, 3000); // poll mỗi 3 giây
+        return () => clearInterval(id);
+    }, [refresh]);
+
+    const startCooking = async (id: string) => {
+        await kitchenApi.startCooking(id);
+        refresh(); // update UI ngay
+    };
+
+    const markDone = async (id: string) => {
+        await kitchenApi.markDone(id);
+        refresh();
+    };
+
+    return { tickets, startCooking, markDone, refresh };
+}
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/hooks/useMenu.ts
+// Fetch menu 1 lần khi mount, cung cấp cho MenuGrid + OrderForm
+// ────────────────────────────────────────────────────────────
+import { useState, useEffect } from 'react';
+import { orderApi } from '../services/orderApi';
+import type { MenuItem } from '../types';
+
+export function useMenu() {
+    const [menu, setMenu] = useState<MenuItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        orderApi.getMenu()
+            .then(setMenu)
+            .catch(e => setError(e.message))
+            .finally(() => setLoading(false));
+    }, []);
+
+    return { menu, loading, error };
+}
+
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/hooks/useTables.ts
+// Poll mỗi 3s — server xem sơ đồ bàn real-time
+// ────────────────────────────────────────────────────────────
+import { useState, useEffect } from 'react';
+import { api } from '../services/api';
+import type { Table } from '../types';
+
+export function useTables() {
+    const [tables, setTables] = useState<Table[]>([]);
+
+    useEffect(() => {
+        const fetch = () =>
+            api.get<Table[]>('/tables').then(r => setTables(r.data)).catch(console.error);
+
+        fetch();
+        const id = setInterval(fetch, 3000);
+        return () => clearInterval(id);
+    }, []);
+
+    return { tables };
+}
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/pages/AdminPage.tsx
+// Role: admin — tạo tài khoản và phân quyền
+// ────────────────────────────────────────────────────────────
+import { useState } from 'react';
+import { analyticsApi } from '../services/analyticsApi';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import type { Role } from '../types';
+
+const ROLES: Role[] = ['server', 'chef', 'casher', 'manager', 'admin'];
+
+export function AdminPage() {
+    const [form, setForm] = useState({ username: '', password: '', role: 'server' as Role });
+    const [message, setMessage] = useState('');
+    const { logout } = useAuth();
+    const navigate = useNavigate();
+
+    const submit = async () => {
+        try {
+            await analyticsApi.createUser(form);
+            setMessage(`Đã tạo tài khoản "${form.username}" (${form.role})`);
+            setForm({ username: '', password: '', role: 'server' });
+        } catch (e: any) { setMessage(`Lỗi: ${e.message}`); }
+    };
+
+    return (
+        <div style={{ padding: 24, maxWidth: 400 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
+                <h1>Admin</h1>
+                <button onClick={() => { logout(); navigate('/login'); }}>Đăng xuất</button>
+            </div>
+
+            <h2 style={{ marginBottom: 16, fontSize: 18 }}>Tạo tài khoản</h2>
+
+            {(['username', 'password'] as const).map(field => (
+                <input key={field}
+                    type={field === 'password' ? 'password' : 'text'}
+                    placeholder={field === 'username' ? 'Tên đăng nhập' : 'Mật khẩu'}
+                    value={form[field]}
+                    onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
+                    style={{
+                        display: 'block', width: '100%', padding: 10, marginBottom: 12,
+                        borderRadius: 6, border: '1px solid #ddd', boxSizing: 'border-box'
+                    }}
+                />
+            ))}
+
+            <select value={form.role}
+                onChange={e => setForm(f => ({ ...f, role: e.target.value as Role }))}
+                style={{
+                    width: '100%', padding: 10, marginBottom: 16,
+                    borderRadius: 6, border: '1px solid #ddd'
+                }}
+            >
+                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+
+            <button onClick={submit}
+                style={{
+                    width: '100%', padding: 12, background: '#2c3e50',
+                    color: '#fff', border: 'none', borderRadius: 8,
+                    fontSize: 16, cursor: 'pointer'
+                }}
+            >
+                Tạo tài khoản
+            </button>
+
+            {message && (
+                <div style={{
+                    marginTop: 12, padding: 12, background: '#f0f9f4',
+                    borderRadius: 6, fontSize: 14, color: '#27ae60'
+                }}>
+                    {message}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/pages/CasherPage.tsx
+// Role: casher — thanh toán hóa đơn
+// ────────────────────────────────────────────────────────────
+import { BillPanel } from '../components/BillPanel';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+
+export function CasherPage() {
+    const { logout } = useAuth();
+    const navigate = useNavigate();
+
+    return (
+        <div style={{ padding: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
+                <h1>Thu ngân</h1>
+                <button onClick={() => { logout(); navigate('/login'); }}>Đăng xuất</button>
+            </div>
+            <BillPanel />
+        </div>
+    );
+}
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/pages/KitchenPage.tsx
+// Role: chef — xem và xử lý ticket
+// ────────────────────────────────────────────────────────────
+import { KitchenBoard } from '../components/KitchenBoard';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+
+export function KitchenPage() {
+    const { logout } = useAuth();
+    const navigate = useNavigate();
+
+    return (
+        <div style={{ padding: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
+                <h1>Bếp</h1>
+                <button onClick={() => { logout(); navigate('/login'); }}>Đăng xuất</button>
+            </div>
+            <KitchenBoard />
+        </div>
+    );
+}
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/pages/LoginPage.tsx
+// ────────────────────────────────────────────────────────────
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { analyticsApi } from '../services/analyticsApi';
+import { useAuth } from '../context/AuthContext';
+
+export function LoginPage() {
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const { login, user } = useAuth();
+    const navigate = useNavigate();
+
+    // Role → trang mặc định sau khi đăng nhập
+    const roleDefaultRoute: Record<string, string> = {
+        server: '/server',
+        chef: '/kitchen',
+        casher: '/casher',
+        manager: '/manager',
+        admin: '/admin',
+    };
+
+    const submit = async () => {
+        try {
+            const { token } = await analyticsApi.login(username, password);
+            login(token);
+            // Redirect dựa vào role trong token
+            // Bằng:
+            login(token); // login() trong AuthContext đã decode rồi
+            const { user } = useAuth(); // nhưng state chưa update ngay
+        } catch { setError('Sai tên đăng nhập hoặc mật khẩu'); }
+    };
+
+    return (
+        <div style={{
+            minHeight: '100vh', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', background: '#f5f5f5'
+        }}>
+            <div style={{
+                padding: 32, background: '#fff', borderRadius: 12,
+                width: 320, boxShadow: '0 2px 12px rgba(0,0,0,.08)'
+            }}>
+                <h2 style={{ marginBottom: 24, textAlign: 'center' }}>IRMS</h2>
+
+                <input placeholder="Tên đăng nhập" value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    style={{
+                        width: '100%', padding: 10, marginBottom: 12,
+                        borderRadius: 6, border: '1px solid #ddd', boxSizing: 'border-box'
+                    }}
+                />
+                <input type="password" placeholder="Mật khẩu" value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && submit()}
+                    style={{
+                        width: '100%', padding: 10, marginBottom: 16,
+                        borderRadius: 6, border: '1px solid #ddd', boxSizing: 'border-box'
+                    }}
+                />
+
+                {error && <div style={{ color: '#e74c3c', marginBottom: 12, fontSize: 14 }}>{error}</div>}
+
+                <button onClick={submit}
+                    style={{
+                        width: '100%', padding: 12, background: '#2c3e50',
+                        color: '#fff', border: 'none', borderRadius: 8,
+                        fontSize: 16, cursor: 'pointer'
+                    }}
+                >
+                    Đăng nhập
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/pages/ManagerPage.tsx
+// Role: manager — bàn + kho + doanh thu (3 tab)
+// ────────────────────────────────────────────────────────────
+import { useState } from 'react';
+import { TableMap } from '../components/TableMap';
+import { RevenueChart } from '../components/RevenueChart';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { inventoryApi } from '../services/inventoryApi';
+import { useEffect } from 'react';
+import type { Ingredient } from '../types';
+
+export function ManagerPage() {
+    const [tab, setTab] = useState<'tables' | 'inventory' | 'revenue'>('tables');
+    const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+    const { logout } = useAuth();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        if (tab === 'inventory')
+            inventoryApi.getAll().then(setIngredients).catch(console.error);
+    }, [tab]);
+
+    return (
+        <div style={{ padding: 24, maxWidth: 1000, margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
+                <h1>Quản lý</h1>
+                <button onClick={() => { logout(); navigate('/login'); }}>Đăng xuất</button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+                {(['tables', 'inventory', 'revenue'] as const).map(t => (
+                    <button key={t} onClick={() => setTab(t)}
+                        style={{
+                            padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                            background: tab === t ? '#2c3e50' : '#eee',
+                            color: tab === t ? '#fff' : '#333'
+                        }}
+                    >
+                        {t === 'tables' ? 'Sơ đồ bàn' : t === 'inventory' ? 'Kho nguyên liệu' : 'Doanh thu'}
+                    </button>
+                ))}
+            </div>
+
+            {tab === 'tables' && <TableMap />}
+            {tab === 'revenue' && <RevenueChart />}
+            {tab === 'inventory' && (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                        <tr style={{ background: '#f5f5f5' }}>
+                            {['Nguyên liệu', 'Số lượng', 'Đơn vị', 'Ngưỡng cảnh báo'].map(h => (
+                                <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500 }}>{h}</th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {ingredients.map(item => (
+                            <tr key={item.id}
+                                style={{
+                                    borderTop: '1px solid #eee',
+                                    background: item.quantity < item.threshold ? '#fff3f3' : 'transparent'
+                                }}>
+                                <td style={{ padding: '8px 12px' }}>{item.name}</td>
+                                <td style={{
+                                    padding: '8px 12px',
+                                    color: item.quantity < item.threshold ? '#e74c3c' : 'inherit',
+                                    fontWeight: item.quantity < item.threshold ? 500 : 400
+                                }}>
+                                    {item.quantity}
+                                </td>
+                                <td style={{ padding: '8px 12px' }}>{item.unit}</td>
+                                <td style={{ padding: '8px 12px', color: '#999' }}>{item.threshold}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+        </div>
+    );
+}
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/pages/ServerPage.tsx
+// Role: server — tạo đơn + xem sơ đồ bàn
+// ────────────────────────────────────────────────────────────
+import { useState } from 'react';
+import { OrderForm } from '../components/OrderForm';
+import { TableMap } from '../components/TableMap';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+
+export function ServerPage() {
+    const [tab, setTab] = useState<'order' | 'tables'>('order');
+    const { logout } = useAuth();
+    const navigate = useNavigate();
+
+    const handleLogout = () => { logout(); navigate('/login'); };
+
+    return (
+        <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <h1>Phục vụ</h1>
+                <button onClick={handleLogout} style={{ padding: '6px 12px', cursor: 'pointer' }}>
+                    Đăng xuất
+                </button>
+            </div>
+
+            {/* Tab navigation */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+                {(['order', 'tables'] as const).map(t => (
+                    <button key={t} onClick={() => setTab(t)}
+                        style={{
+                            padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                            background: tab === t ? '#2c3e50' : '#eee',
+                            color: tab === t ? '#fff' : '#333', fontWeight: tab === t ? 500 : 400
+                        }}
+                    >
+                        {t === 'order' ? 'Tạo đơn' : 'Sơ đồ bàn'}
+                    </button>
+                ))}
+            </div>
+
+            {tab === 'order' && <OrderForm />}
+            {tab === 'tables' && <TableMap />}
+        </div>
+    );
+}
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/router/AppRouter.tsx
+// Route guard: redirect về /login nếu chưa đăng nhập hoặc sai role
+// ────────────────────────────────────────────────────────────
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { LoginPage } from '../pages/LoginPage';
+import { ServerPage } from '../pages/ServerPage';
+import { KitchenPage } from '../pages/KitchenPage';
+import { CasherPage } from '../pages/CasherPage';
+import { ManagerPage } from '../pages/ManagerPage';
+import { AdminPage } from '../pages/AdminPage';
+import type { Role } from '../types';
+
+// HOC bảo vệ route — chỉ cho vào nếu có đúng role
+function Guard({ roles, children }: { roles: Role[]; children: JSX.Element }) {
+    const { user } = useAuth();
+    if (!user) return <Navigate to="/login" replace />;
+    if (!roles.includes(user.role)) return <Navigate to="/login" replace />;
+    return children;
+}
+
+export function AppRouter() {
+    return (
+        <BrowserRouter>
+            <Routes>
+                <Route path="/login" element={<LoginPage />} />
+
+                <Route path="/server" element={
+                    <Guard roles={['server', 'manager', 'admin']}>
+                        <ServerPage />
+                    </Guard>
+                } />
+                <Route path="/kitchen" element={
+                    <Guard roles={['chef', 'manager', 'admin']}>
+                        <KitchenPage />
+                    </Guard>
+                } />
+                <Route path="/casher" element={
+                    <Guard roles={['casher', 'manager', 'admin']}>
+                        <CasherPage />
+                    </Guard>
+                } />
+                <Route path="/manager" element={
+                    <Guard roles={['manager', 'admin']}>
+                        <ManagerPage />
+                    </Guard>
+                } />
+                <Route path="/admin" element={
+                    <Guard roles={['admin']}>
+                        <AdminPage />
+                    </Guard>
+                } />
+
+                {/* Fallback */}
+                <Route path="*" element={<Navigate to="/login" replace />} />
+            </Routes>
+        </BrowserRouter>
+    );
+}
+
+// frontend/src/services/analyticsApi.ts
+
+
+import { api } from './api';
+import type { User } from '../types';
+import type { AxiosResponse } from 'axios';
+
+export const analyticsApi = {
+  getDailyRevenue: (date: string) =>
+    api.get<{ date: string; total: number }>(`/analytics/revenue?date=${date}`)
+      .then((r: AxiosResponse<{ date: string; total: number }>) => r.data),
+
+  login: (username: string, password: string) =>
+    api.post<{ token: string }>('/auth/login', { username, password })
+      .then((r: AxiosResponse<{ token: string }>) => r.data),
+
+  createUser: (data: { username: string; password: string; role: string }) =>
+    api.post<User>('/analytics/users', data)
+      .then((r: AxiosResponse<User>) => r.data),
+
+  listUsers: () =>
+    api.get<User[]>('/analytics/users')
+      .then((r: AxiosResponse<User[]>) => r.data),
+};
+// frontend/src/services/api.ts
+// Axios instance dùng chung — gắn JWT vào mọi request
+
+import axios from 'axios';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const BASE_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000/api';
+
+export const api = axios.create({ baseURL: BASE_URL });
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('irms_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('irms_token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
+// frontend/src/services/billingApi.ts
+import { api } from './api';
+import type { Bill } from '../types';
+import type { AxiosResponse } from 'axios';
+
+export const billingApi = {
+  getBillByTable: (tableId: string) =>
+    api.get<Bill>(`/billing/${tableId}`)
+      .then((r: AxiosResponse<Bill>) => r.data),
+
+  pay: (billId: string) =>
+    api.post<Bill>(`/billing/${billId}/pay`)
+      .then((r: AxiosResponse<Bill>) => r.data),
+};
+// frontend/src/services/inventoryApi.ts
+import { api } from './api';
+import type { Ingredient } from '../types';
+import type { AxiosResponse } from 'axios';
+
+export const inventoryApi = {
+  getAll: () =>
+    api.get<Ingredient[]>('/inventory')
+      .then((r: AxiosResponse<Ingredient[]>) => r.data),
+
+  updateQuantity: (name: string, quantity: number) =>
+    api.patch<Ingredient>(`/inventory/${encodeURIComponent(name)}`, { quantity })
+      .then((r: AxiosResponse<Ingredient>) => r.data),
+};
+// frontend/src/services/kitchenApi.ts
+
+import { api } from './api';
+import type { KitchenTicket } from '../types';
+import type { AxiosResponse } from 'axios';
+
+export const kitchenApi = {
+  getActiveTickets: () =>
+    api.get<KitchenTicket[]>('/kitchen/tickets')
+      .then((r: AxiosResponse<KitchenTicket[]>) => r.data),
+
+  startCooking: (id: string) =>
+    api.patch<KitchenTicket>(`/kitchen/${id}/start`)
+      .then((r: AxiosResponse<KitchenTicket>) => r.data),
+
+  markDone: (id: string) =>
+    api.patch<KitchenTicket>(`/kitchen/${id}/done`)
+      .then((r: AxiosResponse<KitchenTicket>) => r.data),
+};
+// frontend/src/services/orderApi.ts
+
+import { api } from './api';
+import type { MenuItem, Order, CreateOrderDto } from '../types';
+import type { AxiosResponse } from 'axios';
+
+export const orderApi = {
+  getMenu: () =>
+    api.get<MenuItem[]>('/menu')
+      .then((r: AxiosResponse<MenuItem[]>) => r.data),
+
+  createOrder: (dto: CreateOrderDto) =>
+    api.post<Order>('/orders', dto)
+      .then((r: AxiosResponse<Order>) => r.data),
+
+  getOrdersByTable: (tableId: string) =>
+    api.get<Order[]>(`/orders/table/${tableId}`)
+      .then((r: AxiosResponse<Order[]>) => r.data),
+
+  setMenuAvailability: (id: string, isAvailable: boolean) =>
+    api.patch(`/menu/${id}/availability`, { isAvailable })
+      .then((r: AxiosResponse) => r.data),
+};
 
 // ────────────────────────────────────────────────────────────
 // frontend/src/types/index.ts
@@ -110,1082 +1130,46 @@ export type User = {
 };
 export type AuthPayload = { id: string; role: Role };
 
-// frontend/src/services/api.ts
-// Axios instance dùng chung — gắn JWT vào mọi request
-
-import axios from 'axios';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const BASE_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000/api';
-
-export const api = axios.create({ baseURL: BASE_URL });
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('irms_token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('irms_token');
-      window.location.href = '/login';
-    }
-    return Promise.reject(err);
-  }
-);
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/services/orderApi.ts
-// ────────────────────────────────────────────────────────────
-import { api } from './api';
-import type { MenuItem, Order, CreateOrderDto } from '../types';
-import type { AxiosResponse } from 'axios';
-
-export const orderApi = {
-  getMenu: () =>
-    api.get<MenuItem[]>('/menu')
-      .then((r: AxiosResponse<MenuItem[]>) => r.data),
-
-  createOrder: (dto: CreateOrderDto) =>
-    api.post<Order>('/orders', dto)
-      .then((r: AxiosResponse<Order>) => r.data),
-
-  getOrdersByTable: (tableId: string) =>
-    api.get<Order[]>(`/orders/table/${tableId}`)
-      .then((r: AxiosResponse<Order[]>) => r.data),
-
-  setMenuAvailability: (id: string, isAvailable: boolean) =>
-    api.patch(`/menu/${id}/availability`, { isAvailable })
-      .then((r: AxiosResponse) => r.data),
-};
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/services/kitchenApi.ts
-// ────────────────────────────────────────────────────────────
-import { api } from './api';
-import type { KitchenTicket } from '../types';
-import type { AxiosResponse } from 'axios';
-
-export const kitchenApi = {
-  getActiveTickets: () =>
-    api.get<KitchenTicket[]>('/kitchen/tickets')
-      .then((r: AxiosResponse<KitchenTicket[]>) => r.data),
-
-  startCooking: (id: string) =>
-    api.patch<KitchenTicket>(`/kitchen/${id}/start`)
-      .then((r: AxiosResponse<KitchenTicket>) => r.data),
-
-  markDone: (id: string) =>
-    api.patch<KitchenTicket>(`/kitchen/${id}/done`)
-      .then((r: AxiosResponse<KitchenTicket>) => r.data),
-};
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/services/billingApi.ts
-// ────────────────────────────────────────────────────────────
-import { api } from './api';
-import type { Bill } from '../types';
-import type { AxiosResponse } from 'axios';
-
-export const billingApi = {
-  getBillByTable: (tableId: string) =>
-    api.get<Bill>(`/billing/${tableId}`)
-      .then((r: AxiosResponse<Bill>) => r.data),
-
-  pay: (billId: string) =>
-    api.post<Bill>(`/billing/${billId}/pay`)
-      .then((r: AxiosResponse<Bill>) => r.data),
-};
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/services/inventoryApi.ts
-// ────────────────────────────────────────────────────────────
-import { api } from './api';
-import type { Ingredient } from '../types';
-import type { AxiosResponse } from 'axios';
-
-export const inventoryApi = {
-  getAll: () =>
-    api.get<Ingredient[]>('/inventory')
-      .then((r: AxiosResponse<Ingredient[]>) => r.data),
-
-  updateQuantity: (name: string, quantity: number) =>
-    api.patch<Ingredient>(`/inventory/${encodeURIComponent(name)}`, { quantity })
-      .then((r: AxiosResponse<Ingredient>) => r.data),
-};
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/services/analyticsApi.ts
-// ────────────────────────────────────────────────────────────
-import { api } from './api';
-import type { User } from '../types';
-import type { AxiosResponse } from 'axios';
-
-export const analyticsApi = {
-  getDailyRevenue: (date: string) =>
-    api.get<{ date: string; total: number }>(`/analytics/revenue?date=${date}`)
-      .then((r: AxiosResponse<{ date: string; total: number }>) => r.data),
-
-  login: (username: string, password: string) =>
-    api.post<{ token: string }>('/auth/login', { username, password })
-      .then((r: AxiosResponse<{ token: string }>) => r.data),
-
-  createUser: (data: { username: string; password: string; role: string }) =>
-    api.post<User>('/analytics/users', data)
-      .then((r: AxiosResponse<User>) => r.data),
-
-  listUsers: () =>
-    api.get<User[]>('/analytics/users')
-      .then((r: AxiosResponse<User[]>) => r.data),
-};
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/context/AuthContext.tsx
-// JWT decode + lưu token + cung cấp user info toàn app
-// ────────────────────────────────────────────────────────────
-import React, { createContext, useContext, useState } from 'react';
-import { jwtDecode } from 'jwt-decode';
-import type { AuthPayload, Role } from '../types';
-
-type AuthCtx = {
-  user:    AuthPayload | null;
-  token:   string | null;
-  login:   (token: string) => void;
-  logout:  () => void;
-  hasRole: (...roles: Role[]) => boolean;
-};
-
-const AuthContext = createContext<AuthCtx>(null!);
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<string | null>(
-    () => localStorage.getItem('irms_token')
-  );
-  const [user, setUser] = useState<AuthPayload | null>(() => {
-    const t = localStorage.getItem('irms_token');
-    return t ? jwtDecode<AuthPayload>(t) : null;
-  });
-
-  const login = (newToken: string) => {
-    localStorage.setItem('irms_token', newToken);
-    setToken(newToken);
-    setUser(jwtDecode<AuthPayload>(newToken));
-  };
-
-  const logout = () => {
-    localStorage.removeItem('irms_token');
-    setToken(null);
-    setUser(null);
-  };
-
-  const hasRole = (...roles: Role[]) =>
-    user ? roles.includes(user.role) : false;
-
-  return (
-    <AuthContext.Provider value={{ user, token, login, logout, hasRole }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export const useAuth = () => useContext(AuthContext);
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/hooks/useMenu.ts
-// Fetch menu 1 lần khi mount, cung cấp cho MenuGrid + OrderForm
-// ────────────────────────────────────────────────────────────
-import { useState, useEffect } from 'react';
-import { orderApi } from '../services/orderApi';
-import type { MenuItem } from '../types';
-
-export function useMenu() {
-  const [menu, setMenu]       = useState<MenuItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
-
-  useEffect(() => {
-    orderApi.getMenu()
-      .then(setMenu)
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
-
-  return { menu, loading, error };
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/hooks/useKitchen.ts
-// Poll mỗi 3s — không cần WebSocket, đủ dùng cho nhà hàng nhỏ
-// ────────────────────────────────────────────────────────────
-import { useState, useEffect, useCallback } from 'react';
-import { kitchenApi } from '../services/kitchenApi';
-import type { KitchenTicket } from '../types';
-
-export function useKitchen() {
-  const [tickets, setTickets] = useState<KitchenTicket[]>([]);
-
-  const refresh = useCallback(() => {
-    kitchenApi.getActiveTickets().then(setTickets).catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, 3000); // poll mỗi 3 giây
-    return () => clearInterval(id);
-  }, [refresh]);
-
-  const startCooking = async (id: string) => {
-    await kitchenApi.startCooking(id);
-    refresh(); // update UI ngay
-  };
-
-  const markDone = async (id: string) => {
-    await kitchenApi.markDone(id);
-    refresh();
-  };
-
-  return { tickets, startCooking, markDone, refresh };
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/hooks/useTables.ts
-// Poll mỗi 3s — server xem sơ đồ bàn real-time
-// ────────────────────────────────────────────────────────────
-import { useState, useEffect } from 'react';
-import { api } from '../services/api';
-import type { Table } from '../types';
-
-export function useTables() {
-  const [tables, setTables] = useState<Table[]>([]);
-
-  useEffect(() => {
-    const fetch = () =>
-      api.get<Table[]>('/tables').then(r => setTables(r.data)).catch(console.error);
-
-    fetch();
-    const id = setInterval(fetch, 3000);
-    return () => clearInterval(id);
-  }, []);
-
-  return { tables };
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/hooks/useBilling.ts
-// ────────────────────────────────────────────────────────────
-import { useState } from 'react';
-import { billingApi } from '../services/billingApi';
-import type { Bill } from '../types';
-
-export function useBilling() {
-  const [bill, setBill]       = useState<Bill | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const fetchBill = async (tableId: string) => {
-    setLoading(true);
-    try {
-      const b = await billingApi.getBillByTable(tableId);
-      setBill(b);
-    } finally { setLoading(false); }
-  };
-
-  const pay = async (billId: string) => {
-    const paid = await billingApi.pay(billId);
-    setBill(paid);
-  };
-
-  return { bill, loading, fetchBill, pay };
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/components/MenuGrid.tsx
-// Hiển thị toàn bộ menu, highlight combo hết hàng
-// ────────────────────────────────────────────────────────────
-import type { MenuItem } from '../types';
-
-type Props = {
-  menu:     MenuItem[];
-  onSelect: (item: MenuItem) => void;
-};
-
-export function MenuGrid({ menu, onSelect }: Props) {
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-      {menu.map(item => (
-        <button
-          key={item.id}
-          disabled={!item.isAvailable}
-          onClick={() => onSelect(item)}
-          style={{
-            padding: 16,
-            opacity: item.isAvailable ? 1 : 0.4,
-            border: '1px solid #ddd',
-            borderRadius: 8,
-            cursor: item.isAvailable ? 'pointer' : 'not-allowed',
-            background: item.isAvailable ? '#fff' : '#f5f5f5',
-          }}
-        >
-          <div style={{ fontWeight: 500 }}>{item.name}</div>
-          <div style={{ color: '#666', fontSize: 13 }}>
-            {item.price.toLocaleString('vi-VN')} đ
-          </div>
-          {!item.isAvailable && (
-            <div style={{ color: '#e74c3c', fontSize: 12 }}>Hết hàng</div>
-          )}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/components/OrderForm.tsx
-// Form tạo đơn: chọn combo (từ MenuGrid) → nhập số bàn + ghi chú → submit
-// ────────────────────────────────────────────────────────────
-import { useState } from 'react';
-import { orderApi } from '../services/orderApi';
-import { MenuGrid } from './MenuGrid';
-import { useMenu } from '../hooks/useMenu';
-import type { MenuItem, CreateOrderDto } from '../types';
-
-export function OrderForm() {
-  const { menu, loading } = useMenu();
-  const [selected, setSelected] = useState<MenuItem | null>(null);
-  const [tableId,  setTableId]  = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [notes,    setNotes]    = useState('');
-  const [status,   setStatus]   = useState<'idle' | 'loading' | 'success'>('idle');
-
-  const submit = async () => {
-    if (!selected || !tableId) return;
-    setStatus('loading');
-    try {
-      const dto: CreateOrderDto = {
-        tableId, comboId: selected.id, quantity, notes,
-      };
-      await orderApi.createOrder(dto);
-      setStatus('success');
-      // reset form
-      setSelected(null); setTableId(''); setQuantity(1); setNotes('');
-      setTimeout(() => setStatus('idle'), 2000);
-    } catch { setStatus('idle'); }
-  };
-
-  if (loading) return <div>Đang tải menu...</div>;
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <MenuGrid menu={menu} onSelect={setSelected} />
-
-      {selected && (
-        <div style={{ padding: 12, background: '#f0f9f4', borderRadius: 8 }}>
-          <strong>Đã chọn:</strong> {selected.name} —{' '}
-          {selected.price.toLocaleString('vi-VN')} đ
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input
-          placeholder="Số bàn (vd: 001)"
-          value={tableId}
-          onChange={e => setTableId(e.target.value)}
-          style={{ flex: 1, padding: 8, borderRadius: 6, border: '1px solid #ddd' }}
-        />
-        <input
-          type="number" min={1} value={quantity}
-          onChange={e => setQuantity(Number(e.target.value))}
-          style={{ width: 70, padding: 8, borderRadius: 6, border: '1px solid #ddd' }}
-        />
-      </div>
-
-      <textarea
-        placeholder="Ghi chú (không cay, dị ứng...)"
-        value={notes}
-        onChange={e => setNotes(e.target.value)}
-        rows={2}
-        style={{ padding: 8, borderRadius: 6, border: '1px solid #ddd' }}
-      />
-
-      <button
-        onClick={submit}
-        disabled={!selected || !tableId || status === 'loading'}
-        style={{
-          padding: '10px 24px', borderRadius: 8, border: 'none',
-          background: status === 'success' ? '#27ae60' : '#2c3e50',
-          color: '#fff', cursor: 'pointer', fontWeight: 500,
-        }}
-      >
-        {status === 'loading' ? 'Đang gửi...' :
-         status === 'success' ? 'Đã tạo đơn!' : 'Tạo đơn'}
-      </button>
-    </div>
-  );
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/components/KitchenBoard.tsx
-// Hiển thị danh sách ticket theo cột trạng thái
-// ────────────────────────────────────────────────────────────
-import { useKitchen } from '../hooks/useKitchen';
-
-export function KitchenBoard() {
-  const { tickets, startCooking, markDone } = useKitchen();
-
-  const pending = tickets.filter(t => t.status === 'pending');
-  const cooking = tickets.filter(t => t.status === 'cooking');
-
-  const cardStyle = {
-    padding: 12, border: '1px solid #ddd', borderRadius: 8,
-    background: '#fff', marginBottom: 8,
-  };
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-      {/* Cột: Chờ nấu */}
-      <div>
-        <h3 style={{ color: '#e67e22' }}>Chờ nấu ({pending.length})</h3>
-        {pending.map(t => (
-          <div key={t.id} style={cardStyle}>
-            <div style={{ fontWeight: 500 }}>Bàn {t.tableId}</div>
-            <div>{t.quantity}x {t.comboName}</div>
-            {t.notes && <div style={{ color: '#666', fontSize: 13 }}>"{t.notes}"</div>}
-            <button
-              onClick={() => startCooking(t.id)}
-              style={{ marginTop: 8, padding: '6px 12px', background: '#e67e22',
-                       color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-            >
-              Bắt đầu nấu
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {/* Cột: Đang nấu */}
-      <div>
-        <h3 style={{ color: '#27ae60' }}>Đang nấu ({cooking.length})</h3>
-        {cooking.map(t => (
-          <div key={t.id} style={cardStyle}>
-            <div style={{ fontWeight: 500 }}>Bàn {t.tableId}</div>
-            <div>{t.quantity}x {t.comboName}</div>
-            {t.notes && <div style={{ color: '#666', fontSize: 13 }}>"{t.notes}"</div>}
-            <button
-              onClick={() => markDone(t.id)}
-              style={{ marginTop: 8, padding: '6px 12px', background: '#27ae60',
-                       color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-            >
-              Xong món
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/components/TableMap.tsx
-// Hiển thị sơ đồ bàn với màu trạng thái
-// ────────────────────────────────────────────────────────────
-import { useTables } from '../hooks/useTables';
-import type { TableStatus } from '../types';
-
-const colorMap: Record<TableStatus, string> = {
-  available:  '#27ae60',  // xanh lá — trống
-  occupied:   '#e67e22',  // cam     — có khách, đang nấu
-  food_ready: '#2980b9',  // xanh    — món đã ra, chờ dọn
-};
-const labelMap: Record<TableStatus, string> = {
-  available:  'Trống',
-  occupied:   'Có khách',
-  food_ready: 'Món đã ra',
-};
-
-export function TableMap() {
-  const { tables } = useTables();
-
-  return (
-    <div>
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 16, fontSize: 13 }}>
-        {Object.entries(colorMap).map(([status, color]) => (
-          <span key={status} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 2,
-                           background: color, display: 'inline-block' }}/>
-            {labelMap[status as TableStatus]}
-          </span>
-        ))}
-      </div>
-
-      {/* Grid bàn */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
-        {tables.map(table => (
-          <div
-            key={table.id}
-            style={{
-              padding: 16, borderRadius: 8, textAlign: 'center',
-              background: colorMap[table.status],
-              color: '#fff', fontWeight: 500,
-            }}
-          >
-            <div style={{ fontSize: 18 }}>Bàn {table.tableNumber}</div>
-            <div style={{ fontSize: 12, opacity: 0.85 }}>
-              {labelMap[table.status]}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/components/BillPanel.tsx
-// Thu ngân tìm hóa đơn theo bàn, xác nhận thanh toán
-// ────────────────────────────────────────────────────────────
-import { useState } from 'react';
-import { useBilling } from '../hooks/useBilling';
-
-export function BillPanel() {
-  const { bill, loading, fetchBill, pay } = useBilling();
-  const [tableInput, setTableInput] = useState('');
-
-  return (
-    <div style={{ maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Tìm hóa đơn */}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input
-          placeholder="Số bàn..."
-          value={tableInput}
-          onChange={e => setTableInput(e.target.value)}
-          style={{ flex: 1, padding: 8, borderRadius: 6, border: '1px solid #ddd' }}
-        />
-        <button
-          onClick={() => fetchBill(tableInput)}
-          style={{ padding: '8px 16px', background: '#2c3e50',
-                   color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-        >
-          Tìm
-        </button>
-      </div>
-
-      {loading && <div>Đang tải...</div>}
-
-      {/* Hiển thị hóa đơn */}
-      {bill && (
-        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
-          <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 8 }}>
-            Hóa đơn bàn {bill.tableId}
-          </div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: '#2c3e50', marginBottom: 16 }}>
-            {bill.totalAmount.toLocaleString('vi-VN')} đ
-          </div>
-          <div style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
-            Trạng thái: {bill.status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
-          </div>
-
-          {bill.status === 'pending' && (
-            <button
-              onClick={() => pay(bill.id)}
-              style={{
-                width: '100%', padding: 12, background: '#27ae60',
-                color: '#fff', border: 'none', borderRadius: 8,
-                fontSize: 16, fontWeight: 500, cursor: 'pointer',
-              }}
-            >
-              Xác nhận thanh toán
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/components/RevenueChart.tsx
-// Manager xem doanh thu ngày hôm nay
-// ────────────────────────────────────────────────────────────
-import { useState, useEffect } from 'react';
-import { analyticsApi } from '../services/analyticsApi';
-
-export function RevenueChart() {
-  const today = new Date().toISOString().slice(0, 10);
-  const [total, setTotal]   = useState<number | null>(null);
-  const [date,  setDate]    = useState(today);
-
-  useEffect(() => {
-    analyticsApi.getDailyRevenue(date)
-      .then(d => setTotal(d.total))
-      .catch(console.error);
-  }, [date]);
-
-  return (
-    <div style={{ padding: 24, border: '1px solid #ddd', borderRadius: 12, maxWidth: 360 }}>
-      <div style={{ marginBottom: 12, fontSize: 14, color: '#666' }}>Doanh thu ngày</div>
-      <input
-        type="date" value={date}
-        onChange={e => setDate(e.target.value)}
-        style={{ padding: 6, borderRadius: 6, border: '1px solid #ddd', marginBottom: 16 }}
-      />
-      <div style={{ fontSize: 36, fontWeight: 700, color: '#2c3e50' }}>
-        {total === null ? '...' : `${total.toLocaleString('vi-VN')} đ`}
-      </div>
-    </div>
-  );
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/pages/LoginPage.tsx
-// ────────────────────────────────────────────────────────────
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { analyticsApi } from '../services/analyticsApi';
-import { useAuth } from '../context/AuthContext';
-
-export function LoginPage() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error,    setError]    = useState('');
-  const { login, user }         = useAuth();
-  const navigate                = useNavigate();
-
-  // Role → trang mặc định sau khi đăng nhập
-  const roleDefaultRoute: Record<string, string> = {
-    server:  '/server',
-    chef:    '/kitchen',
-    casher:  '/casher',
-    manager: '/manager',
-    admin:   '/admin',
-  };
-
-  const submit = async () => {
-    try {
-      const { token } = await analyticsApi.login(username, password);
-      login(token);
-      // Redirect dựa vào role trong token
-      const decoded = JSON.parse(atob(token.split('.')[1]));
-      navigate(roleDefaultRoute[decoded.role] ?? '/');
-    } catch { setError('Sai tên đăng nhập hoặc mật khẩu'); }
-  };
-
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', background: '#f5f5f5' }}>
-      <div style={{ padding: 32, background: '#fff', borderRadius: 12,
-                    width: 320, boxShadow: '0 2px 12px rgba(0,0,0,.08)' }}>
-        <h2 style={{ marginBottom: 24, textAlign: 'center' }}>IRMS</h2>
-
-        <input placeholder="Tên đăng nhập" value={username}
-          onChange={e => setUsername(e.target.value)}
-          style={{ width: '100%', padding: 10, marginBottom: 12,
-                   borderRadius: 6, border: '1px solid #ddd', boxSizing: 'border-box' }}
-        />
-        <input type="password" placeholder="Mật khẩu" value={password}
-          onChange={e => setPassword(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && submit()}
-          style={{ width: '100%', padding: 10, marginBottom: 16,
-                   borderRadius: 6, border: '1px solid #ddd', boxSizing: 'border-box' }}
-        />
-
-        {error && <div style={{ color: '#e74c3c', marginBottom: 12, fontSize: 14 }}>{error}</div>}
-
-        <button onClick={submit}
-          style={{ width: '100%', padding: 12, background: '#2c3e50',
-                   color: '#fff', border: 'none', borderRadius: 8,
-                   fontSize: 16, cursor: 'pointer' }}
-        >
-          Đăng nhập
-        </button>
-      </div>
-    </div>
-  );
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/pages/ServerPage.tsx
-// Role: server — tạo đơn + xem sơ đồ bàn
-// ────────────────────────────────────────────────────────────
-import { useState } from 'react';
-import { OrderForm } from '../components/OrderForm';
-import { TableMap }  from '../components/TableMap';
-import { useAuth }   from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-
-export function ServerPage() {
-  const [tab, setTab]   = useState<'order' | 'tables'>('order');
-  const { logout }      = useAuth();
-  const navigate        = useNavigate();
-
-  const handleLogout = () => { logout(); navigate('/login'); };
-
-  return (
-    <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1>Phục vụ</h1>
-        <button onClick={handleLogout} style={{ padding: '6px 12px', cursor: 'pointer' }}>
-          Đăng xuất
-        </button>
-      </div>
-
-      {/* Tab navigation */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        {(['order', 'tables'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            style={{ padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                     background: tab === t ? '#2c3e50' : '#eee',
-                     color: tab === t ? '#fff' : '#333', fontWeight: tab === t ? 500 : 400 }}
-          >
-            {t === 'order' ? 'Tạo đơn' : 'Sơ đồ bàn'}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'order'  && <OrderForm />}
-      {tab === 'tables' && <TableMap />}
-    </div>
-  );
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/pages/KitchenPage.tsx
-// Role: chef — xem và xử lý ticket
-// ────────────────────────────────────────────────────────────
-import { KitchenBoard } from '../components/KitchenBoard';
-import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-
-export function KitchenPage() {
-  const { logout } = useAuth();
-  const navigate   = useNavigate();
-
-  return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1>Bếp</h1>
-        <button onClick={() => { logout(); navigate('/login'); }}>Đăng xuất</button>
-      </div>
-      <KitchenBoard />
-    </div>
-  );
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/pages/CasherPage.tsx
-// Role: casher — thanh toán hóa đơn
-// ────────────────────────────────────────────────────────────
-import { BillPanel } from '../components/BillPanel';
-import { useAuth }   from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-
-export function CasherPage() {
-  const { logout } = useAuth();
-  const navigate   = useNavigate();
-
-  return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1>Thu ngân</h1>
-        <button onClick={() => { logout(); navigate('/login'); }}>Đăng xuất</button>
-      </div>
-      <BillPanel />
-    </div>
-  );
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/pages/ManagerPage.tsx
-// Role: manager — bàn + kho + doanh thu (3 tab)
-// ────────────────────────────────────────────────────────────
-import { useState }        from 'react';
-import { TableMap }        from '../components/TableMap';
-import { RevenueChart }    from '../components/RevenueChart';
-import { useAuth }         from '../context/AuthContext';
-import { useNavigate }     from 'react-router-dom';
-import { inventoryApi }    from '../services/inventoryApi';
-import { useEffect }       from 'react';
-import type { Ingredient } from '../types';
-
-export function ManagerPage() {
-  const [tab, setTab]             = useState<'tables' | 'inventory' | 'revenue'>('tables');
-  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const { logout }                = useAuth();
-  const navigate                  = useNavigate();
-
-  useEffect(() => {
-    if (tab === 'inventory')
-      inventoryApi.getAll().then(setIngredients).catch(console.error);
-  }, [tab]);
-
-  return (
-    <div style={{ padding: 24, maxWidth: 1000, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1>Quản lý</h1>
-        <button onClick={() => { logout(); navigate('/login'); }}>Đăng xuất</button>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        {(['tables', 'inventory', 'revenue'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            style={{ padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                     background: tab === t ? '#2c3e50' : '#eee',
-                     color: tab === t ? '#fff' : '#333' }}
-          >
-            {t === 'tables' ? 'Sơ đồ bàn' : t === 'inventory' ? 'Kho nguyên liệu' : 'Doanh thu'}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'tables'    && <TableMap />}
-      {tab === 'revenue'   && <RevenueChart />}
-      {tab === 'inventory' && (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#f5f5f5' }}>
-              {['Nguyên liệu', 'Số lượng', 'Đơn vị', 'Ngưỡng cảnh báo'].map(h => (
-                <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {ingredients.map(item => (
-              <tr key={item.id}
-                style={{ borderTop: '1px solid #eee',
-                         background: item.quantity < item.threshold ? '#fff3f3' : 'transparent' }}>
-                <td style={{ padding: '8px 12px' }}>{item.name}</td>
-                <td style={{ padding: '8px 12px',
-                             color: item.quantity < item.threshold ? '#e74c3c' : 'inherit',
-                             fontWeight: item.quantity < item.threshold ? 500 : 400 }}>
-                  {item.quantity}
-                </td>
-                <td style={{ padding: '8px 12px' }}>{item.unit}</td>
-                <td style={{ padding: '8px 12px', color: '#999' }}>{item.threshold}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/pages/AdminPage.tsx
-// Role: admin — tạo tài khoản và phân quyền
-// ────────────────────────────────────────────────────────────
-import { useState }     from 'react';
-import { analyticsApi } from '../services/analyticsApi';
-import { useAuth }      from '../context/AuthContext';
-import { useNavigate }  from 'react-router-dom';
-import type { Role }    from '../types';
-
-const ROLES: Role[] = ['server', 'chef', 'casher', 'manager', 'admin'];
-
-export function AdminPage() {
-  const [form, setForm]     = useState({ username: '', password: '', role: 'server' as Role });
-  const [message, setMessage] = useState('');
-  const { logout }          = useAuth();
-  const navigate            = useNavigate();
-
-  const submit = async () => {
-    try {
-      await analyticsApi.createUser(form);
-      setMessage(`Đã tạo tài khoản "${form.username}" (${form.role})`);
-      setForm({ username: '', password: '', role: 'server' });
-    } catch (e: any) { setMessage(`Lỗi: ${e.message}`); }
-  };
-
-  return (
-    <div style={{ padding: 24, maxWidth: 400 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1>Admin</h1>
-        <button onClick={() => { logout(); navigate('/login'); }}>Đăng xuất</button>
-      </div>
-
-      <h2 style={{ marginBottom: 16, fontSize: 18 }}>Tạo tài khoản</h2>
-
-      {(['username', 'password'] as const).map(field => (
-        <input key={field}
-          type={field === 'password' ? 'password' : 'text'}
-          placeholder={field === 'username' ? 'Tên đăng nhập' : 'Mật khẩu'}
-          value={form[field]}
-          onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
-          style={{ display: 'block', width: '100%', padding: 10, marginBottom: 12,
-                   borderRadius: 6, border: '1px solid #ddd', boxSizing: 'border-box' }}
-        />
-      ))}
-
-      <select value={form.role}
-        onChange={e => setForm(f => ({ ...f, role: e.target.value as Role }))}
-        style={{ width: '100%', padding: 10, marginBottom: 16,
-                 borderRadius: 6, border: '1px solid #ddd' }}
-      >
-        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-      </select>
-
-      <button onClick={submit}
-        style={{ width: '100%', padding: 12, background: '#2c3e50',
-                 color: '#fff', border: 'none', borderRadius: 8,
-                 fontSize: 16, cursor: 'pointer' }}
-      >
-        Tạo tài khoản
-      </button>
-
-      {message && (
-        <div style={{ marginTop: 12, padding: 12, background: '#f0f9f4',
-                      borderRadius: 6, fontSize: 14, color: '#27ae60' }}>
-          {message}
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/router/AppRouter.tsx
-// Route guard: redirect về /login nếu chưa đăng nhập hoặc sai role
-// ────────────────────────────────────────────────────────────
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth }      from '../context/AuthContext';
-import { LoginPage }    from '../pages/LoginPage';
-import { ServerPage }   from '../pages/ServerPage';
-import { KitchenPage }  from '../pages/KitchenPage';
-import { CasherPage }   from '../pages/CasherPage';
-import { ManagerPage }  from '../pages/ManagerPage';
-import { AdminPage }    from '../pages/AdminPage';
-import type { Role }    from '../types';
-
-// HOC bảo vệ route — chỉ cho vào nếu có đúng role
-function Guard({ roles, children }: { roles: Role[]; children: JSX.Element }) {
-  const { user } = useAuth();
-  if (!user)                       return <Navigate to="/login" replace />;
-  if (!roles.includes(user.role))  return <Navigate to="/login" replace />;
-  return children;
-}
-
-export function AppRouter() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-
-        <Route path="/server" element={
-          <Guard roles={['server', 'manager', 'admin']}>
-            <ServerPage />
-          </Guard>
-        } />
-        <Route path="/kitchen" element={
-          <Guard roles={['chef', 'manager', 'admin']}>
-            <KitchenPage />
-          </Guard>
-        } />
-        <Route path="/casher" element={
-          <Guard roles={['casher', 'manager', 'admin']}>
-            <CasherPage />
-          </Guard>
-        } />
-        <Route path="/manager" element={
-          <Guard roles={['manager', 'admin']}>
-            <ManagerPage />
-          </Guard>
-        } />
-        <Route path="/admin" element={
-          <Guard roles={['admin']}>
-            <AdminPage />
-          </Guard>
-        } />
-
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </BrowserRouter>
-  );
-}
-
 
 // ────────────────────────────────────────────────────────────
 // frontend/src/App.tsx
 // ────────────────────────────────────────────────────────────
 import { AuthProvider } from './context/AuthContext';
-import { AppRouter }    from './router/AppRouter';
+import { AppRouter } from './router/AppRouter';
 
 export default function App() {
-  return (
-    <AuthProvider>
-      <AppRouter />
-    </AuthProvider>
-  );
+    return (
+        <AuthProvider>
+            <AppRouter />
+        </AuthProvider>
+    );
 }
-
 
 // ────────────────────────────────────────────────────────────
 // frontend/src/main.tsx
 // ────────────────────────────────────────────────────────────
-import React    from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App      from './App';
+import App from './App';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
+    <React.StrictMode>
+        <App />
+    </React.StrictMode>
 );
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/package.json
-// ────────────────────────────────────────────────────────────
-// {
-//   "name": "irms-frontend",
-//   "scripts": { "dev": "vite", "build": "tsc && vite build" },
-//   "dependencies": {
-//     "axios": "^1.6.0",
-//     "jwt-decode": "^4.0.0",
-//     "react": "^18.2.0",
-//     "react-dom": "^18.2.0",
-//     "react-router-dom": "^6.22.0"
-//   },
-//   "devDependencies": {
-//     "@types/react": "^18.2.0",
-//     "@vitejs/plugin-react": "^4.2.0",
-//     "typescript": "^5.3.0",
-//     "vite": "^5.1.0"
-//   }
-// }
-
-
+/// <reference types="vite/client" />
 
 // location: frontend/src/vite-env.d.ts
 interface ImportMetaEnv {
   readonly VITE_API_URL: string;
 }
-/// <reference types="vite/client" />
+
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
-
-// pacakge-lock.json
+// location: frontend/.env
+VITE_API_URL=http://localhost:3000/api
+// location: frontend/package-lock.json, đây là file cũ tôi chưa cập nhập, bạn có thể tham khảo
 {
   "name": "irms-frontend",
   "lockfileVersion": 3,
@@ -3237,1541 +3221,44 @@ interface ImportMeta {
     }
   }
 }
+// location: frontend/package.json
 
-// vite.config.ts
-null 
-
-// ════════════════════════════════════════════════════════════
-// BACKEND — app.ts (composition root)
-// Backend code đầy đủ đã có ở irms-full-skeleton.ts
-// Đây chỉ nhắc lại app.ts để thấy FE gọi BE qua /api/*
-// ════════════════════════════════════════════════════════════
-import express from 'express';
-import cors    from 'cors';
-
-async function bootstrap() {
-  const app      = express();
-  const eventBus = new SimpleEventBus();
-
-  app.use(cors({ origin: 'http://localhost:5173' })); // Vite dev server
-  app.use(express.json());
-
-  // Thứ tự subscriber trước, publisher sau
-  app.use('/api', registerKitchenModule(pool, eventBus));
-  app.use('/api', registerTableModule(pool, eventBus));
-  app.use('/api', registerInventoryModule(pool, eventBus));
-  app.use('/api', registerBillingModule(pool, eventBus));
-  app.use('/api', registerAnalyticsModule(pool, eventBus));
-  app.use('/api', registerOrderModule(pool, eventBus));
-
-  app.listen(3000);
+{
+  "name": "irms-frontend",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "jwt-decode": "^4.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "typescript": "^5.3.0",
+    "vite": "^5.1.0"
+  }
 }
-bootstrap();
+// frontend/vite.config.ts
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
-
-// ════════════════════════════════════════════════════════════
-// LUỒNG HOÀN CHỈNH — Server tạo đơn đến Chef nhận ticket
-//
-//  [Tablet server]
-//   └─ ServerPage.tsx (tab "Tạo đơn")
-//       └─ OrderForm.tsx
-//           └─ orderApi.createOrder(dto)
-//               └─ axios POST /api/orders  { tableId, comboId, quantity, notes }
-//                   │
-//                   ▼  [Backend]
-//               OrderController.createOrder()
-//               OrderService.createOrder()
-//                 ├─ menuRepo.findById()      → PostgreSQL
-//                 ├─ orderRepo.save()         → PostgreSQL
-//                 └─ eventBus.publish(ORDER_CREATED)
-//                     ├─ KitchenService → kitchenRepo.save() → PostgreSQL
-//                     ├─ TableService   → tableRepo.update() → PostgreSQL
-//                     └─ InventoryService → deduct() → PostgreSQL
-//               res.status(201).json(order)
-//                   │
-//                   ▼  [Frontend]
-//               OrderForm: setStatus('success')
-//
-//  [Tablet chef] — đang poll mỗi 3 giây
-//   └─ KitchenPage.tsx
-//       └─ KitchenBoard.tsx
-//           └─ useKitchen → setInterval(kitchenApi.getActiveTickets, 3000)
-//               └─ axios GET /api/kitchen/tickets
-//                   └─ KitchenController → KitchenService → KitchenRepository
-//                   └─ trả về ticket mới vừa được tạo bởi KitchenService
-//               → KitchenBoard render ticket mới trong cột "Chờ nấu"
-// ════════════════════════════════════════════════════════════
-
-// src/infrastructure/auth.ts
-// JWT middleware + helper sign/verify
-
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-
-export type Role = 'admin' | 'manager' | 'server' | 'chef' | 'casher';
-
-export interface AuthPayload {
-  id: string;
-  role: Role;
-}
-
-// Extend Express Request
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthPayload;
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': 'http://localhost:3000'
     }
   }
-}
+})
+// backend part
 
-const SECRET = process.env.JWT_SECRET || 'irms_super_secret_key_change_in_production';
-const EXPIRES = process.env.JWT_EXPIRES_IN || '8h';
-
-export function signToken(payload: AuthPayload): string {
-  return jwt.sign(payload, SECRET, { expiresIn: EXPIRES } as jwt.SignOptions);
-}
-
-export function verifyToken(token: string): AuthPayload {
-  return jwt.verify(token, SECRET) as AuthPayload;
-}
-
-// Middleware: xác thực JWT
-export function authenticate(req: Request, res: Response, next: NextFunction): void {
-  const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Missing token' });
-    return;
-  }
-  try {
-    req.user = verifyToken(header.slice(7));
-    next();
-  } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
-  }
-}
-
-// Middleware factory: kiểm tra role
-export function authorize(...roles: Role[]) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      res.status(403).json({ error: 'Forbidden' });
-      return;
-    }
-    next();
-  };
-}
-
-// src/infrastructure/db.ts
-// PostgreSQL connection pool — singleton, dùng chung toàn app
-import { Pool } from 'pg';
-
-// Load .env thủ công (không dùng dotenv package)
-import * as fs from 'fs';
-import * as path from 'path';
-
-function loadEnv() {
-  const envPath = path.join(__dirname, '../../.env');
-  if (!fs.existsSync(envPath)) return;
-  const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const [key, ...rest] = trimmed.split('=');
-    if (key && !process.env[key]) {
-      process.env[key] = rest.join('=').trim();
-    }
-  }
-}
-loadEnv();
-
-export const pool = new Pool({
-  host:     process.env.DB_HOST     || 'localhost',
-  port:     parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME     || 'irms',
-  user:     process.env.DB_USER     || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  max: 20,          // max 20 connections — đủ cho peak hours
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
-
-pool.on('error', (err) => {
-  console.error('[DB] Unexpected error on idle client', err);
-});
-// src/infrastructure/eventBus.ts
-// In-process event bus — đủ dùng cho service-based architecture
-// Nếu scale lên microservices thì thay bằng Redis Pub/Sub hoặc RabbitMQ
-
-type Handler = (payload: unknown) => void | Promise<void>;
-
-export class SimpleEventBus {
-  private handlers: Map<string, Handler[]> = new Map();
-
-  subscribe(event: string, handler: Handler): void {
-    if (!this.handlers.has(event)) {
-      this.handlers.set(event, []);
-    }
-    this.handlers.get(event)!.push(handler);
-    console.log(`[EventBus] Subscribed to "${event}"`);
-  }
-
-  async publish(event: string, payload: unknown): Promise<void> {
-    const handlers = this.handlers.get(event) ?? [];
-    if (handlers.length === 0) {
-      console.warn(`[EventBus] No handlers for "${event}"`);
-      return;
-    }
-    console.log(`[EventBus] Publishing "${event}" to ${handlers.length} handler(s)`);
-    // Chạy song song tất cả handlers
-    await Promise.allSettled(
-      handlers.map(h =>
-        Promise.resolve(h(payload)).catch(err =>
-          console.error(`[EventBus] Handler error for "${event}":`, err)
-        )
-      )
-    );
-  }
-}
-// src/infrastructure/initDb.ts
-// Chạy một lần để tạo bảng + seed data mẫu
-// Lệnh: npm run db:init
-
-import { pool } from './db';
-import bcrypt from 'bcryptjs';
-
-async function initDb() {
-  const client = await pool.connect();
-  try {
-    console.log('[InitDB] Creating tables...');
-
-    await client.query(`
-      -- Extensions
-      CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
-      -- Users
-      CREATE TABLE IF NOT EXISTS users (
-        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        username   VARCHAR(50) UNIQUE NOT NULL,
-        password   TEXT NOT NULL,
-        role       VARCHAR(20) NOT NULL CHECK (role IN ('admin','manager','server','chef','casher')),
-        created_at TIMESTAMPTZ DEFAULT NOW()
-      );
-
-      -- Menu items (combo)
-      CREATE TABLE IF NOT EXISTS menu_items (
-        id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name         VARCHAR(100) NOT NULL,
-        price        INTEGER NOT NULL,   -- đơn vị: VND
-        is_available BOOLEAN DEFAULT TRUE,
-        created_at   TIMESTAMPTZ DEFAULT NOW()
-      );
-
-      -- Dishes (món ăn trong combo)
-      CREATE TABLE IF NOT EXISTS dishes (
-        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name          VARCHAR(100) NOT NULL,
-        category      VARCHAR(50),  -- ngọt/mặn/...
-        cooking_method VARCHAR(50)  -- nướng/xào/chiên/...
-      );
-
-      -- Combo → Dish mapping
-      CREATE TABLE IF NOT EXISTS combo_dishes (
-        combo_id  UUID REFERENCES menu_items(id) ON DELETE CASCADE,
-        dish_id   UUID REFERENCES dishes(id)     ON DELETE CASCADE,
-        PRIMARY KEY (combo_id, dish_id)
-      );
-
-      -- Ingredients (nguyên liệu kho)
-      CREATE TABLE IF NOT EXISTS ingredients (
-        id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name      VARCHAR(100) UNIQUE NOT NULL,
-        quantity  NUMERIC(10,2) NOT NULL DEFAULT 0,
-        unit      VARCHAR(20) NOT NULL,
-        threshold NUMERIC(10,2) NOT NULL DEFAULT 0
-      );
-
-      -- Dish → Ingredient mapping (số lượng cần để nấu 1 đơn vị dish)
-      CREATE TABLE IF NOT EXISTS dish_ingredients (
-        dish_id         UUID REFERENCES dishes(id) ON DELETE CASCADE,
-        ingredient_name VARCHAR(100) NOT NULL,
-        qty_needed      NUMERIC(10,2) NOT NULL,
-        unit            VARCHAR(20)   NOT NULL,
-        PRIMARY KEY (dish_id, ingredient_name)
-      );
-
-      -- Tables (bàn ăn)
-      CREATE TABLE IF NOT EXISTS tables (
-        id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        table_number VARCHAR(10) UNIQUE NOT NULL,
-        status       VARCHAR(20) DEFAULT 'available'
-                     CHECK (status IN ('available','occupied','food_ready'))
-      );
-
-      -- Orders
-      CREATE TABLE IF NOT EXISTS orders (
-        id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        table_id    VARCHAR(20) NOT NULL,
-        combo_id    UUID REFERENCES menu_items(id),
-        combo_name  VARCHAR(100) NOT NULL,
-        quantity    INTEGER NOT NULL DEFAULT 1,
-        notes       TEXT DEFAULT '',
-        total_price INTEGER NOT NULL,
-        status      VARCHAR(20) DEFAULT 'pending'
-                    CHECK (status IN ('pending','cooking','done')),
-        created_at  TIMESTAMPTZ DEFAULT NOW()
-      );
-
-      -- Kitchen tickets
-      CREATE TABLE IF NOT EXISTS kitchen_tickets (
-        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        order_id   UUID REFERENCES orders(id) ON DELETE CASCADE,
-        table_id   VARCHAR(20) NOT NULL,
-        combo_name VARCHAR(100) NOT NULL,
-        quantity   INTEGER NOT NULL,
-        notes      TEXT DEFAULT '',
-        status     VARCHAR(20) DEFAULT 'pending'
-                   CHECK (status IN ('pending','cooking','done')),
-        created_at TIMESTAMPTZ DEFAULT NOW()
-      );
-
-      -- Bills
-      CREATE TABLE IF NOT EXISTS bills (
-        id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        order_id     UUID REFERENCES orders(id),
-        table_id     VARCHAR(20) NOT NULL,
-        total_amount INTEGER NOT NULL,
-        status       VARCHAR(20) DEFAULT 'pending'
-                     CHECK (status IN ('pending','paid')),
-        created_at   TIMESTAMPTZ DEFAULT NOW()
-      );
-
-      -- Revenue records
-      CREATE TABLE IF NOT EXISTS revenues (
-        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        bill_id    UUID REFERENCES bills(id),
-        amount     INTEGER NOT NULL,
-        date       DATE NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT NOW()
-      );
-    `);
-
-    console.log('[InitDB] Tables created. Seeding data...');
-
-    // Seed admin user
-    const adminHash = await bcrypt.hash('admin123', 10);
-    const managerHash = await bcrypt.hash('manager123', 10);
-    const serverHash = await bcrypt.hash('server123', 10);
-    const chefHash = await bcrypt.hash('chef123', 10);
-    const casherHash = await bcrypt.hash('casher123', 10);
-
-    await client.query(`
-      INSERT INTO users (username, password, role) VALUES
-        ('admin',   $1, 'admin'),
-        ('manager', $2, 'manager'),
-        ('server1', $3, 'server'),
-        ('chef1',   $4, 'chef'),
-        ('casher1', $5, 'casher')
-      ON CONFLICT (username) DO NOTHING;
-    `, [adminHash, managerHash, serverHash, chefHash, casherHash]);
-
-    // Seed menu items
-    await client.query(`
-      INSERT INTO menu_items (id, name, price, is_available) VALUES
-        ('a1b2c3d4-0000-0000-0000-000000000001', 'Combo Gà Hàn Quốc',     130000, true),
-        ('a1b2c3d4-0000-0000-0000-000000000002', 'Combo Gogi Bò Nướng',   180000, true),
-        ('a1b2c3d4-0000-0000-0000-000000000003', 'Combo Phở Đặc Biệt',    95000,  true),
-        ('a1b2c3d4-0000-0000-0000-000000000004', 'Combo Trẻ Em Khuyến Mãi',65000,  true),
-        ('a1b2c3d4-0000-0000-0000-000000000005', 'Combo Hải Sản Cao Cấp', 250000, true),
-        ('a1b2c3d4-0000-0000-0000-000000000006', 'Combo Chay Thanh Đạm',  80000,  true)
-      ON CONFLICT (id) DO NOTHING;
-    `);
-
-    // Seed tables (10 bàn)
-    await client.query(`
-      INSERT INTO tables (table_number, status) VALUES
-        ('001', 'available'), ('002', 'available'), ('003', 'available'),
-        ('004', 'available'), ('005', 'available'), ('006', 'available'),
-        ('007', 'available'), ('008', 'available'), ('009', 'available'),
-        ('010', 'available')
-      ON CONFLICT (table_number) DO NOTHING;
-    `);
-
-    // Seed ingredients
-    await client.query(`
-      INSERT INTO ingredients (name, quantity, unit, threshold) VALUES
-        ('Gà',          50,    'kg',  10),
-        ('Bò',          30,    'kg',  8),
-        ('Rau muống',   100,   'bó',  20),
-        ('Dầu ăn',      20000, 'ml',  3000),
-        ('Tỏi',         5000,  'g',   500),
-        ('Hành',        3000,  'g',   400),
-        ('Bún/Phở',     80,    'kg',  15),
-        ('Xương hầm',   25,    'kg',  5),
-        ('Tôm',         20,    'kg',  5),
-        ('Mực',         15,    'kg',  4),
-        ('Rau cải',     60,    'bó',  10),
-        ('Đậu hũ',      40,    'kg',  8),
-        ('Nước mắm',    10000, 'ml',  1000),
-        ('Muối',        5000,  'g',   500),
-        ('Đường',       3000,  'g',   300)
-      ON CONFLICT (name) DO NOTHING;
-    `);
-
-    console.log('[InitDB] ✅ Done! Default accounts:');
-    console.log('  admin   / admin123');
-    console.log('  manager / manager123');
-    console.log('  server1 / server123');
-    console.log('  chef1   / chef123');
-    console.log('  casher1 / casher123');
-
-  } finally {
-    client.release();
-    await pool.end();
-  }
-}
-
-initDb().catch(err => {
-  console.error('[InitDB] FAILED:', err);
-  process.exit(1);
-});
-// src/modules/analytics/index.ts
-// Module Analytics & Admin — doanh thu + quản lý user
-
-import { Router, Request, Response } from 'express';
-import { Pool } from 'pg';
-import bcrypt from 'bcryptjs';
-import { SimpleEventBus } from '../../infrastructure/eventBus';
-import { authenticate, authorize, signToken } from '../../infrastructure/auth';
-import { EVENTS, PaymentCompletedPayload } from '../../shared/events';
-import type { Role } from '../../infrastructure/auth';
-
-// ─── Models ───────────────────────────────────────────────
-interface User {
-  id: string;
-  username: string;
-  role: Role;
-  createdAt: string;
-}
-
-interface Revenue {
-  id: string;
-  billId: string;
-  amount: number;
-  date: string;
-}
-
-// ─── Repository ───────────────────────────────────────────
-class AnalyticsRepository {
-  constructor(private db: Pool) {}
-
-  async saveRevenue(billId: string, amount: number, date: string): Promise<void> {
-    await this.db.query(
-      `INSERT INTO revenues (bill_id, amount, date) VALUES ($1, $2, $3)`,
-      [billId, amount, date]
-    );
-  }
-
-  async getDailyRevenue(date: string): Promise<number> {
-    const { rows } = await this.db.query(
-      `SELECT COALESCE(SUM(amount), 0) AS total FROM revenues WHERE date = $1`,
-      [date]
-    );
-    return parseInt(rows[0]?.total ?? '0', 10);
-  }
-
-  async findUserByUsername(username: string): Promise<{ id: string; username: string; role: Role; password: string } | null> {
-    const { rows } = await this.db.query(
-      `SELECT id, username, role, password FROM users WHERE username = $1`,
-      [username]
-    );
-    return rows[0] ?? null;
-  }
-
-  async createUser(username: string, hashedPassword: string, role: Role): Promise<User> {
-    const { rows } = await this.db.query(
-      `INSERT INTO users (username, password, role)
-       VALUES ($1, $2, $3)
-       RETURNING id, username, role, created_at AS "createdAt"`,
-      [username, hashedPassword, role]
-    );
-    return rows[0];
-  }
-
-  async listUsers(): Promise<User[]> {
-    const { rows } = await this.db.query(
-      `SELECT id, username, role, created_at AS "createdAt" FROM users ORDER BY created_at DESC`
-    );
-    return rows;
-  }
-}
-
-// ─── Service ──────────────────────────────────────────────
-class AnalyticsService {
-  constructor(
-    private repo: AnalyticsRepository,
-    private eventBus: SimpleEventBus
-  ) {}
-
-  async login(username: string, password: string): Promise<string> {
-    const user = await this.repo.findUserByUsername(username);
-    if (!user) throw new Error('Invalid credentials');
-
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) throw new Error('Invalid credentials');
-
-    return signToken({ id: user.id, role: user.role });
-  }
-
-  async getDailyRevenue(date: string): Promise<{ date: string; total: number }> {
-    const total = await this.repo.getDailyRevenue(date);
-    return { date, total };
-  }
-
-  async createUser(data: { username: string; password: string; role: Role }): Promise<User> {
-    const existing = await this.repo.findUserByUsername(data.username);
-    if (existing) throw new Error(`Username "${data.username}" already exists`);
-
-    const hashed = await bcrypt.hash(data.password, 10);
-    return this.repo.createUser(data.username, hashed, data.role);
-  }
-
-  async listUsers(): Promise<User[]> {
-    return this.repo.listUsers();
-  }
-
-  registerEventHandlers(): void {
-    // PAYMENT_COMPLETED → ghi nhận doanh thu
-    this.eventBus.subscribe(EVENTS.PAYMENT_COMPLETED, async (raw) => {
-      const payload = raw as PaymentCompletedPayload;
-      console.log(`[Analytics] PAYMENT_COMPLETED → recording revenue ${payload.amount} on ${payload.date}`);
-      await this.repo.saveRevenue(payload.billId, payload.amount, payload.date);
-    });
-  }
-}
-
-// ─── Controller / Router ──────────────────────────────────
-export function registerAnalyticsModule(db: Pool, eventBus: SimpleEventBus): Router {
-  const router  = Router();
-  const repo    = new AnalyticsRepository(db);
-  const service = new AnalyticsService(repo, eventBus);
-
-  service.registerEventHandlers();
-
-  // POST /auth/login — public
-  router.post('/auth/login', async (req: Request, res: Response) => {
-    try {
-      const { username, password } = req.body;
-      if (!username || !password) {
-        res.status(400).json({ error: 'username and password required' });
-        return;
-      }
-      const token = await service.login(username, password);
-      res.json({ token });
-    } catch (e: any) {
-      res.status(401).json({ error: e.message });
-    }
-  });
-
-  // GET /analytics/revenue?date=YYYY-MM-DD — manager, admin
-  router.get('/analytics/revenue',
-    authenticate, authorize('manager', 'admin'),
-    async (req: Request, res: Response) => {
-      try {
-        const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
-        res.json(await service.getDailyRevenue(date));
-      } catch (e: any) {
-        res.status(500).json({ error: e.message });
-      }
-    }
-  );
-
-  // POST /analytics/users — admin only
-  router.post('/analytics/users',
-    authenticate, authorize('admin'),
-    async (req: Request, res: Response) => {
-      try {
-        const { username, password, role } = req.body;
-        if (!username || !password || !role) {
-          res.status(400).json({ error: 'username, password, role required' });
-          return;
-        }
-        const user = await service.createUser({ username, password, role });
-        res.status(201).json(user);
-      } catch (e: any) {
-        res.status(400).json({ error: e.message });
-      }
-    }
-  );
-
-  // GET /analytics/users — admin only
-  router.get('/analytics/users',
-    authenticate, authorize('admin'),
-    async (_req: Request, res: Response) => {
-      try {
-        res.json(await service.listUsers());
-      } catch (e: any) {
-        res.status(500).json({ error: e.message });
-      }
-    }
-  );
-
-  return router;
-}
-// src/modules/billing/index.ts
-// Module Billing & Payment
-
-import { Router, Request, Response } from 'express';
-import { Pool } from 'pg';
-import { SimpleEventBus } from '../../infrastructure/eventBus';
-import { authenticate, authorize } from '../../infrastructure/auth';
-import {
-  EVENTS,
-  OrderCompletedPayload,
-  PaymentCompletedPayload,
-} from '../../shared/events';
-
-// ─── Models ───────────────────────────────────────────────
-interface Bill {
-  id: string;
-  orderId: string;
-  tableId: string;
-  totalAmount: number;
-  status: 'pending' | 'paid';
-  createdAt: string;
-}
-
-// ─── Repository ───────────────────────────────────────────
-class BillingRepository {
-  constructor(private db: Pool) {}
-
-  async createBill(orderId: string, tableId: string, totalAmount: number): Promise<Bill> {
-    // Nếu bill cho order này đã tồn tại (idempotent), trả về cái cũ
-    const existing = await this.db.query(
-      `SELECT id, order_id AS "orderId", table_id AS "tableId",
-              total_amount AS "totalAmount", status, created_at AS "createdAt"
-       FROM bills WHERE order_id = $1 AND status = 'pending'`,
-      [orderId]
-    );
-    if (existing.rows[0]) return existing.rows[0];
-
-    const { rows } = await this.db.query(
-      `INSERT INTO bills (order_id, table_id, total_amount, status)
-       VALUES ($1, $2, $3, 'pending')
-       RETURNING id, order_id AS "orderId", table_id AS "tableId",
-                 total_amount AS "totalAmount", status, created_at AS "createdAt"`,
-      [orderId, tableId, totalAmount]
-    );
-    return rows[0];
-  }
-
-  async findPendingByTable(tableId: string): Promise<Bill | null> {
-    const { rows } = await this.db.query(
-      `SELECT b.id, b.order_id AS "orderId", b.table_id AS "tableId",
-              b.total_amount AS "totalAmount", b.status, b.created_at AS "createdAt"
-       FROM bills b
-       WHERE b.table_id = $1 AND b.status = 'pending'
-       ORDER BY b.created_at DESC LIMIT 1`,
-      [tableId]
-    );
-    return rows[0] ?? null;
-  }
-
-  async findById(id: string): Promise<Bill | null> {
-    const { rows } = await this.db.query(
-      `SELECT id, order_id AS "orderId", table_id AS "tableId",
-              total_amount AS "totalAmount", status, created_at AS "createdAt"
-       FROM bills WHERE id = $1`,
-      [id]
-    );
-    return rows[0] ?? null;
-  }
-
-  async markPaid(id: string): Promise<Bill | null> {
-    const { rows } = await this.db.query(
-      `UPDATE bills SET status = 'paid' WHERE id = $1
-       RETURNING id, order_id AS "orderId", table_id AS "tableId",
-                 total_amount AS "totalAmount", status, created_at AS "createdAt"`,
-      [id]
-    );
-    return rows[0] ?? null;
-  }
-
-  // Lấy total_price từ order để tạo bill khi nhận event
-  async getOrderTotalPrice(orderId: string): Promise<{ totalPrice: number; tableId: string } | null> {
-    const { rows } = await this.db.query(
-      `SELECT total_price AS "totalPrice", table_id AS "tableId"
-       FROM orders WHERE id = $1`,
-      [orderId]
-    );
-    return rows[0] ?? null;
-  }
-}
-
-// ─── Service ──────────────────────────────────────────────
-class BillingService {
-  constructor(
-    private repo: BillingRepository,
-    private eventBus: SimpleEventBus
-  ) {}
-
-  async getBillByTable(tableId: string): Promise<Bill | null> {
-    return this.repo.findPendingByTable(tableId);
-  }
-
-  async pay(billId: string): Promise<Bill> {
-    const bill = await this.repo.markPaid(billId);
-    if (!bill) throw new Error(`Bill ${billId} not found or already paid`);
-
-    const payload: PaymentCompletedPayload = {
-      billId:  bill.id,
-      tableId: bill.tableId,
-      amount:  bill.totalAmount,
-      date:    new Date().toISOString().slice(0, 10),
-    };
-    await this.eventBus.publish(EVENTS.PAYMENT_COMPLETED, payload);
-
-    return bill;
-  }
-
-  registerEventHandlers(): void {
-    // ORDER_COMPLETED → tạo bill sẵn cho thu ngân
-    this.eventBus.subscribe(EVENTS.ORDER_COMPLETED, async (raw) => {
-      const payload = raw as OrderCompletedPayload;
-      console.log(`[Billing] ORDER_COMPLETED → creating bill for order ${payload.orderId}`);
-
-      const orderInfo = await this.repo.getOrderTotalPrice(payload.orderId);
-      if (!orderInfo) {
-        console.error(`[Billing] Order ${payload.orderId} not found`);
-        return;
-      }
-      await this.repo.createBill(payload.orderId, orderInfo.tableId, orderInfo.totalPrice);
-    });
-  }
-}
-
-// ─── Controller / Router ──────────────────────────────────
-export function registerBillingModule(db: Pool, eventBus: SimpleEventBus): Router {
-  const router  = Router();
-  const repo    = new BillingRepository(db);
-  const service = new BillingService(repo, eventBus);
-
-  service.registerEventHandlers();
-
-  // GET /billing/:tableId — casher, manager, admin
-  router.get('/billing/:tableId',
-    authenticate, authorize('casher', 'manager', 'admin'),
-    async (req: Request, res: Response) => {
-      try {
-        const bill = await service.getBillByTable(req.params.tableId);
-        if (!bill) {
-          res.status(404).json({ error: 'No pending bill for this table' });
-          return;
-        }
-        res.json(bill);
-      } catch (e: any) {
-        res.status(500).json({ error: e.message });
-      }
-    }
-  );
-
-  // POST /billing/:billId/pay — casher, manager, admin
-  router.post('/billing/:billId/pay',
-    authenticate, authorize('casher', 'manager', 'admin'),
-    async (req: Request, res: Response) => {
-      try {
-        res.json(await service.pay(req.params.billId));
-      } catch (e: any) {
-        res.status(400).json({ error: e.message });
-      }
-    }
-  );
-
-  return router;
-}
-// src/modules/inventory/index.ts
-// Module Inventory — kho nguyên liệu
-
-import { Router, Request, Response } from 'express';
-import { Pool } from 'pg';
-import { SimpleEventBus } from '../../infrastructure/eventBus';
-import { authenticate, authorize } from '../../infrastructure/auth';
-import { EVENTS, OrderCreatedPayload, RawMaterialLowPayload } from '../../shared/events';
-
-// ─── Models ───────────────────────────────────────────────
-interface Ingredient {
-  id: string;
-  name: string;
-  quantity: number;
-  unit: string;
-  threshold: number;
-}
-
-// ─── Repository ───────────────────────────────────────────
-class InventoryRepository {
-  constructor(private db: Pool) {}
-
-  async findAll(): Promise<Ingredient[]> {
-    const { rows } = await this.db.query(
-      `SELECT id, name, quantity, unit, threshold FROM ingredients ORDER BY name`
-    );
-    return rows;
-  }
-
-  async updateQuantity(name: string, quantity: number): Promise<Ingredient | null> {
-    const { rows } = await this.db.query(
-      `UPDATE ingredients SET quantity = $1 WHERE name = $2
-       RETURNING id, name, quantity, unit, threshold`,
-      [quantity, name]
-    );
-    return rows[0] ?? null;
-  }
-
-  // Trừ nguyên liệu khi có ORDER_CREATED
-  // Lấy danh sách nguyên liệu cần cho combo (qua combo_dishes → dish_ingredients)
-  async deductForCombo(comboId: string, comboQuantity: number): Promise<void> {
-    // Lấy tất cả nguyên liệu cần cho combo này
-    const { rows } = await this.db.query(
-      `SELECT di.ingredient_name, SUM(di.qty_needed * $2) AS total_needed
-       FROM combo_dishes cd
-       JOIN dish_ingredients di ON di.dish_id = cd.dish_id
-       WHERE cd.combo_id = $1
-       GROUP BY di.ingredient_name`,
-      [comboId, comboQuantity]
-    );
-
-    for (const row of rows) {
-      await this.db.query(
-        `UPDATE ingredients
-         SET quantity = GREATEST(0, quantity - $1)
-         WHERE name = $2`,
-        [row.total_needed, row.ingredient_name]
-      );
-    }
-  }
-
-  // Tìm nguyên liệu dưới ngưỡng sau khi trừ
-  async findBelowThreshold(): Promise<Ingredient[]> {
-    const { rows } = await this.db.query(
-      `SELECT id, name, quantity, unit, threshold
-       FROM ingredients WHERE quantity <= threshold`
-    );
-    return rows;
-  }
-
-  async findByName(name: string): Promise<Ingredient | null> {
-    const { rows } = await this.db.query(
-      `SELECT id, name, quantity, unit, threshold
-       FROM ingredients WHERE name = $1`,
-      [name]
-    );
-    return rows[0] ?? null;
-  }
-}
-
-// ─── Service ──────────────────────────────────────────────
-class InventoryService {
-  constructor(
-    private repo: InventoryRepository,
-    private eventBus: SimpleEventBus
-  ) {}
-
-  async getAll(): Promise<Ingredient[]> {
-    return this.repo.findAll();
-  }
-
-  async updateQuantity(name: string, quantity: number): Promise<Ingredient | null> {
-    return this.repo.updateQuantity(name, quantity);
-  }
-
-  registerEventHandlers(): void {
-    // ORDER_CREATED → trừ kho, kiểm tra ngưỡng
-    this.eventBus.subscribe(EVENTS.ORDER_CREATED, async (raw) => {
-      const payload = raw as OrderCreatedPayload;
-      console.log(`[Inventory] ORDER_CREATED → deducting for combo ${payload.comboId} x${payload.quantity}`);
-
-      await this.repo.deductForCombo(payload.comboId, payload.quantity);
-
-      // Kiểm tra ngưỡng sau khi trừ
-      const lowItems = await this.repo.findBelowThreshold();
-      for (const item of lowItems) {
-        const lowPayload: RawMaterialLowPayload = {
-          ingredientName: item.name,
-          currentQty:     item.quantity,
-          threshold:      item.threshold,
-        };
-        console.warn(`[Inventory] LOW STOCK: ${item.name} = ${item.quantity} ${item.unit} (threshold: ${item.threshold})`);
-        await this.eventBus.publish(EVENTS.RAW_MATERIAL_LOW, lowPayload);
-      }
-    });
-  }
-}
-
-// ─── Controller / Router ──────────────────────────────────
-export function registerInventoryModule(db: Pool, eventBus: SimpleEventBus): Router {
-  const router  = Router();
-  const repo    = new InventoryRepository(db);
-  const service = new InventoryService(repo, eventBus);
-
-  service.registerEventHandlers();
-
-  // GET /inventory — manager, admin
-  router.get('/inventory',
-    authenticate, authorize('manager', 'admin'),
-    async (_req: Request, res: Response) => {
-      try {
-        res.json(await service.getAll());
-      } catch (e: any) {
-        res.status(500).json({ error: e.message });
-      }
-    }
-  );
-
-  // PATCH /inventory/:name — manager, admin
-  router.patch('/inventory/:name',
-    authenticate, authorize('manager', 'admin'),
-    async (req: Request, res: Response) => {
-      try {
-        const item = await service.updateQuantity(
-          decodeURIComponent(req.params.name),
-          req.body.quantity
-        );
-        if (!item) {
-          res.status(404).json({ error: 'Ingredient not found' });
-          return;
-        }
-        res.json(item);
-      } catch (e: any) {
-        res.status(400).json({ error: e.message });
-      }
-    }
-  );
-
-  return router;
-}
-// src/modules/kitchen/index.ts
-// Module Kitchen Display System (KDS)
-
-import { Router, Request, Response } from 'express';
-import { Pool } from 'pg';
-import { SimpleEventBus } from '../../infrastructure/eventBus';
-import { authenticate, authorize } from '../../infrastructure/auth';
-import { EVENTS, OrderCreatedPayload, OrderCompletedPayload } from '../../shared/events';
-
-// ─── Models ───────────────────────────────────────────────
-interface KitchenTicket {
-  id: string;
-  orderId: string;
-  tableId: string;
-  comboName: string;
-  quantity: number;
-  notes: string;
-  status: 'pending' | 'cooking' | 'done';
-  createdAt: string;
-}
-
-// ─── Repository ───────────────────────────────────────────
-class KitchenRepository {
-  constructor(private db: Pool) {}
-
-  async saveTicket(payload: OrderCreatedPayload): Promise<KitchenTicket> {
-    const { rows } = await this.db.query(
-      `INSERT INTO kitchen_tickets (order_id, table_id, combo_name, quantity, notes, status)
-       VALUES ($1, $2, $3, $4, $5, 'pending')
-       RETURNING id, order_id AS "orderId", table_id AS "tableId",
-                 combo_name AS "comboName", quantity, notes, status,
-                 created_at AS "createdAt"`,
-      [payload.orderId, payload.tableId, payload.comboName, payload.quantity, payload.notes]
-    );
-    return rows[0];
-  }
-
-  async getActiveTickets(): Promise<KitchenTicket[]> {
-    const { rows } = await this.db.query(
-      `SELECT id, order_id AS "orderId", table_id AS "tableId",
-              combo_name AS "comboName", quantity, notes, status,
-              created_at AS "createdAt"
-       FROM kitchen_tickets
-       WHERE status IN ('pending', 'cooking')
-       ORDER BY created_at ASC`
-    );
-    return rows;
-  }
-
-  async updateStatus(id: string, status: KitchenTicket['status']): Promise<KitchenTicket | null> {
-    const { rows } = await this.db.query(
-      `UPDATE kitchen_tickets SET status = $1 WHERE id = $2
-       RETURNING id, order_id AS "orderId", table_id AS "tableId",
-                 combo_name AS "comboName", quantity, notes, status,
-                 created_at AS "createdAt"`,
-      [status, id]
-    );
-    return rows[0] ?? null;
-  }
-
-  async findById(id: string): Promise<KitchenTicket | null> {
-    const { rows } = await this.db.query(
-      `SELECT id, order_id AS "orderId", table_id AS "tableId",
-              combo_name AS "comboName", quantity, notes, status,
-              created_at AS "createdAt"
-       FROM kitchen_tickets WHERE id = $1`,
-      [id]
-    );
-    return rows[0] ?? null;
-  }
-}
-
-// ─── Service ──────────────────────────────────────────────
-class KitchenService {
-  constructor(
-    private repo: KitchenRepository,
-    private eventBus: SimpleEventBus
-  ) {}
-
-  async getActiveTickets(): Promise<KitchenTicket[]> {
-    return this.repo.getActiveTickets();
-  }
-
-  async startCooking(id: string): Promise<KitchenTicket> {
-    const ticket = await this.repo.updateStatus(id, 'cooking');
-    if (!ticket) throw new Error(`Ticket ${id} not found`);
-    return ticket;
-  }
-
-  async markDone(id: string): Promise<KitchenTicket> {
-    const ticket = await this.repo.updateStatus(id, 'done');
-    if (!ticket) throw new Error(`Ticket ${id} not found`);
-
-    // Phát event ORDER_COMPLETED cho Table + Billing
-    const payload: OrderCompletedPayload = {
-      orderId: ticket.orderId,
-      tableId: ticket.tableId,
-    };
-    await this.eventBus.publish(EVENTS.ORDER_COMPLETED, payload);
-
-    return ticket;
-  }
-
-  registerEventHandlers(): void {
-    // Lắng nghe ORDER_CREATED → tạo ticket
-    this.eventBus.subscribe(EVENTS.ORDER_CREATED, async (raw) => {
-      const payload = raw as OrderCreatedPayload;
-      console.log(`[Kitchen] ORDER_CREATED → creating ticket for order ${payload.orderId}`);
-      await this.repo.saveTicket(payload);
-    });
-  }
-}
-
-// ─── Controller / Router ──────────────────────────────────
-export function registerKitchenModule(db: Pool, eventBus: SimpleEventBus): Router {
-  const router  = Router();
-  const repo    = new KitchenRepository(db);
-  const service = new KitchenService(repo, eventBus);
-
-  service.registerEventHandlers();
-
-  // GET /kitchen/tickets — chef, manager, admin
-  router.get('/kitchen/tickets',
-    authenticate, authorize('chef', 'manager', 'admin'),
-    async (_req: Request, res: Response) => {
-      try {
-        res.json(await service.getActiveTickets());
-      } catch (e: any) {
-        res.status(500).json({ error: e.message });
-      }
-    }
-  );
-
-  // PATCH /kitchen/:id/start — chef, manager, admin
-  router.patch('/kitchen/:id/start',
-    authenticate, authorize('chef', 'manager', 'admin'),
-    async (req: Request, res: Response) => {
-      try {
-        res.json(await service.startCooking(req.params.id));
-      } catch (e: any) {
-        res.status(400).json({ error: e.message });
-      }
-    }
-  );
-
-  // PATCH /kitchen/:id/done — chef, manager, admin
-  router.patch('/kitchen/:id/done',
-    authenticate, authorize('chef', 'manager', 'admin'),
-    async (req: Request, res: Response) => {
-      try {
-        res.json(await service.markDone(req.params.id));
-      } catch (e: any) {
-        res.status(400).json({ error: e.message });
-      }
-    }
-  );
-
-  return router;
-}
-// src/modules/order/index.ts
-// Module Order & Menu — đầy đủ models, repo, service, controller, router
-
-import { Router, Request, Response } from 'express';
-import { Pool } from 'pg';
-import { SimpleEventBus } from '../../infrastructure/eventBus';
-import { authenticate, authorize } from '../../infrastructure/auth';
-import { EVENTS, OrderCreatedPayload } from '../../shared/events';
-
-// ─── Models ───────────────────────────────────────────────
-interface MenuItem {
-  id: string;
-  name: string;
-  price: number;
-  isAvailable: boolean;
-}
-
-interface Order {
-  id: string;
-  tableId: string;
-  comboId: string;
-  comboName: string;
-  quantity: number;
-  notes: string;
-  totalPrice: number;
-  status: 'pending' | 'cooking' | 'done';
-  createdAt: string;
-}
-
-interface CreateOrderDto {
-  tableId: string;
-  comboId: string;
-  quantity: number;
-  notes: string;
-}
-
-// ─── Repository ───────────────────────────────────────────
-class MenuRepository {
-  constructor(private db: Pool) {}
-
-  async findAll(): Promise<MenuItem[]> {
-    const { rows } = await this.db.query(
-      `SELECT id, name, price, is_available AS "isAvailable" FROM menu_items ORDER BY name`
-    );
-    return rows;
-  }
-
-  async findById(id: string): Promise<MenuItem | null> {
-    const { rows } = await this.db.query(
-      `SELECT id, name, price, is_available AS "isAvailable" FROM menu_items WHERE id = $1`,
-      [id]
-    );
-    return rows[0] ?? null;
-  }
-
-  async setAvailability(id: string, isAvailable: boolean): Promise<void> {
-    await this.db.query(
-      `UPDATE menu_items SET is_available = $1 WHERE id = $2`,
-      [isAvailable, id]
-    );
-  }
-
-  // Đặt unavailable khi nguyên liệu thiếu
-  async setUnavailableByIngredient(ingredientName: string): Promise<void> {
-    // Tìm tất cả combo dùng nguyên liệu này (qua dish_ingredients → combo_dishes)
-    await this.db.query(`
-      UPDATE menu_items SET is_available = false
-      WHERE id IN (
-        SELECT DISTINCT cd.combo_id
-        FROM combo_dishes cd
-        JOIN dish_ingredients di ON di.dish_id = cd.dish_id
-        WHERE di.ingredient_name = $1
-      )
-    `, [ingredientName]);
-  }
-}
-
-class OrderRepository {
-  constructor(private db: Pool) {}
-
-  async save(dto: CreateOrderDto, comboName: string, totalPrice: number): Promise<Order> {
-    const { rows } = await this.db.query(
-      `INSERT INTO orders (table_id, combo_id, combo_name, quantity, notes, total_price, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending')
-       RETURNING id, table_id AS "tableId", combo_id AS "comboId",
-                 combo_name AS "comboName", quantity, notes,
-                 total_price AS "totalPrice", status,
-                 created_at AS "createdAt"`,
-      [dto.tableId, dto.comboId, comboName, dto.quantity, dto.notes || '', totalPrice]
-    );
-    return rows[0];
-  }
-
-  async findByTable(tableId: string): Promise<Order[]> {
-    const { rows } = await this.db.query(
-      `SELECT id, table_id AS "tableId", combo_id AS "comboId",
-              combo_name AS "comboName", quantity, notes,
-              total_price AS "totalPrice", status,
-              created_at AS "createdAt"
-       FROM orders WHERE table_id = $1 ORDER BY created_at DESC`,
-      [tableId]
-    );
-    return rows;
-  }
-
-  async updateStatus(id: string, status: Order['status']): Promise<void> {
-    await this.db.query(`UPDATE orders SET status = $1 WHERE id = $2`, [status, id]);
-  }
-}
-
-// ─── Service ──────────────────────────────────────────────
-class OrderService {
-  constructor(
-    private menuRepo: MenuRepository,
-    private orderRepo: OrderRepository,
-    private eventBus: SimpleEventBus
-  ) {}
-
-  async getMenu(): Promise<MenuItem[]> {
-    return this.menuRepo.findAll();
-  }
-
-  async setMenuAvailability(id: string, isAvailable: boolean): Promise<void> {
-    return this.menuRepo.setAvailability(id, isAvailable);
-  }
-
-  async createOrder(dto: CreateOrderDto): Promise<Order> {
-    const combo = await this.menuRepo.findById(dto.comboId);
-    if (!combo) throw new Error(`Combo ${dto.comboId} not found`);
-    if (!combo.isAvailable) throw new Error(`Combo "${combo.name}" is not available`);
-
-    const totalPrice = combo.price * dto.quantity;
-    const order = await this.orderRepo.save(dto, combo.name, totalPrice);
-
-    // Phát event cho Kitchen, Table, Inventory
-    const payload: OrderCreatedPayload = {
-      orderId:    order.id,
-      tableId:    order.tableId,
-      comboId:    order.comboId,
-      comboName:  order.comboName,
-      quantity:   order.quantity,
-      notes:      order.notes,
-      totalPrice: order.totalPrice,
-    };
-    await this.eventBus.publish(EVENTS.ORDER_CREATED, payload);
-
-    return order;
-  }
-
-  async getOrdersByTable(tableId: string): Promise<Order[]> {
-    return this.orderRepo.findByTable(tableId);
-  }
-
-  // Handler: nhận RAW_MATERIAL_LOW từ Inventory
-  registerEventHandlers(): void {
-    this.eventBus.subscribe(EVENTS.RAW_MATERIAL_LOW, async (raw) => {
-      const payload = raw as { ingredientName: string };
-      console.log(`[Order] RAW_MATERIAL_LOW → hiding combos with "${payload.ingredientName}"`);
-      await this.menuRepo.setUnavailableByIngredient(payload.ingredientName);
-    });
-  }
-}
-
-// ─── Controller / Router ──────────────────────────────────
-export function registerOrderModule(db: Pool, eventBus: SimpleEventBus): Router {
-  const router     = Router();
-  const menuRepo   = new MenuRepository(db);
-  const orderRepo  = new OrderRepository(db);
-  const service    = new OrderService(menuRepo, orderRepo, eventBus);
-
-  // Đăng ký event listener ngay khi module được load
-  service.registerEventHandlers();
-
-  // GET /menu — ai cũng được xem
-  router.get('/menu', authenticate, async (_req: Request, res: Response) => {
-    try {
-      res.json(await service.getMenu());
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  // PATCH /menu/:id/availability — admin/manager
-  router.patch('/menu/:id/availability',
-    authenticate, authorize('admin', 'manager'),
-    async (req: Request, res: Response) => {
-      try {
-        await service.setMenuAvailability(req.params.id, req.body.isAvailable);
-        res.json({ ok: true });
-      } catch (e: any) {
-        res.status(400).json({ error: e.message });
-      }
-    }
-  );
-
-  // POST /orders — server, manager, admin
-  router.post('/orders',
-    authenticate, authorize('server', 'manager', 'admin'),
-    async (req: Request, res: Response) => {
-      try {
-        const order = await service.createOrder(req.body as CreateOrderDto);
-        res.status(201).json(order);
-      } catch (e: any) {
-        res.status(400).json({ error: e.message });
-      }
-    }
-  );
-
-  // GET /orders/table/:tableId — server, casher, manager, admin
-  router.get('/orders/table/:tableId',
-    authenticate, authorize('server', 'casher', 'manager', 'admin'),
-    async (req: Request, res: Response) => {
-      try {
-        res.json(await service.getOrdersByTable(req.params.tableId));
-      } catch (e: any) {
-        res.status(500).json({ error: e.message });
-      }
-    }
-  );
-
-  return router;
-}
-// src/modules/table/index.ts
-// Module Table & Reservation — theo dõi trạng thái bàn
-
-import { Router, Request, Response } from 'express';
-import { Pool } from 'pg';
-import { SimpleEventBus } from '../../infrastructure/eventBus';
-import { authenticate, authorize } from '../../infrastructure/auth';
-import {
-  EVENTS,
-  OrderCreatedPayload,
-  OrderCompletedPayload,
-  PaymentCompletedPayload,
-} from '../../shared/events';
-
-// ─── Models ───────────────────────────────────────────────
-type TableStatus = 'available' | 'occupied' | 'food_ready';
-
-interface Table {
-  id: string;
-  tableNumber: string;
-  status: TableStatus;
-}
-
-// ─── Repository ───────────────────────────────────────────
-class TableRepository {
-  constructor(private db: Pool) {}
-
-  async findAll(): Promise<Table[]> {
-    const { rows } = await this.db.query(
-      `SELECT id, table_number AS "tableNumber", status FROM tables ORDER BY table_number`
-    );
-    return rows;
-  }
-
-  async findByNumber(tableNumber: string): Promise<Table | null> {
-    const { rows } = await this.db.query(
-      `SELECT id, table_number AS "tableNumber", status
-       FROM tables WHERE table_number = $1`,
-      [tableNumber]
-    );
-    return rows[0] ?? null;
-  }
-
-  async updateStatusByNumber(tableNumber: string, status: TableStatus): Promise<void> {
-    // Nếu bàn chưa tồn tại trong DB, tạo mới (upsert)
-    await this.db.query(
-      `INSERT INTO tables (table_number, status) VALUES ($1, $2)
-       ON CONFLICT (table_number) DO UPDATE SET status = $2`,
-      [tableNumber, status]
-    );
-  }
-}
-
-// ─── Service ──────────────────────────────────────────────
-class TableService {
-  constructor(
-    private repo: TableRepository,
-    private eventBus: SimpleEventBus
-  ) {}
-
-  async getAllTables(): Promise<Table[]> {
-    return this.repo.findAll();
-  }
-
-  registerEventHandlers(): void {
-    // ORDER_CREATED → bàn chuyển sang "occupied"
-    this.eventBus.subscribe(EVENTS.ORDER_CREATED, async (raw) => {
-      const payload = raw as OrderCreatedPayload;
-      console.log(`[Table] ORDER_CREATED → table ${payload.tableId} → occupied`);
-      await this.repo.updateStatusByNumber(payload.tableId, 'occupied');
-    });
-
-    // ORDER_COMPLETED → bàn chuyển sang "food_ready"
-    this.eventBus.subscribe(EVENTS.ORDER_COMPLETED, async (raw) => {
-      const payload = raw as OrderCompletedPayload;
-      console.log(`[Table] ORDER_COMPLETED → table ${payload.tableId} → food_ready`);
-      await this.repo.updateStatusByNumber(payload.tableId, 'food_ready');
-    });
-
-    // PAYMENT_COMPLETED → bàn trở về "available"
-    this.eventBus.subscribe(EVENTS.PAYMENT_COMPLETED, async (raw) => {
-      const payload = raw as PaymentCompletedPayload;
-      console.log(`[Table] PAYMENT_COMPLETED → table ${payload.tableId} → available`);
-      await this.repo.updateStatusByNumber(payload.tableId, 'available');
-    });
-  }
-}
-
-// ─── Controller / Router ──────────────────────────────────
-export function registerTableModule(db: Pool, eventBus: SimpleEventBus): Router {
-  const router  = Router();
-  const repo    = new TableRepository(db);
-  const service = new TableService(repo, eventBus);
-
-  service.registerEventHandlers();
-
-  // GET /tables — server, manager, admin
-  router.get('/tables',
-    authenticate, authorize('server', 'manager', 'admin', 'casher'),
-    async (_req: Request, res: Response) => {
-      try {
-        res.json(await service.getAllTables());
-      } catch (e: any) {
-        res.status(500).json({ error: e.message });
-      }
-    }
-  );
-
-  return router;
-}
-// src/shared/events.ts
-// Tất cả tên event dùng chung — không dùng string magic
-
-export const EVENTS = {
-  ORDER_CREATED:       'ORDER_CREATED',
-  ORDER_COMPLETED:     'ORDER_COMPLETED',
-  PAYMENT_COMPLETED:   'PAYMENT_COMPLETED',
-  RAW_MATERIAL_LOW:    'RAW_MATERIAL_LOW',
-} as const;
-
-// Payload types cho mỗi event
-export interface OrderCreatedPayload {
-  orderId:   string;
-  tableId:   string;
-  comboId:   string;
-  comboName: string;
-  quantity:  number;
-  notes:     string;
-  totalPrice: number;
-}
-
-export interface OrderCompletedPayload {
-  orderId:  string;
-  tableId:  string;
-}
-
-export interface PaymentCompletedPayload {
-  billId:   string;
-  tableId:  string;
-  amount:   number;
-  date:     string;
-}
-
-export interface RawMaterialLowPayload {
-  ingredientName: string;
-  currentQty:     number;
-  threshold:      number;
-}
-// src/app.ts
-// Composition root — nối tất cả module lại
-
-import express from 'express';
-import cors from 'cors';
-import { pool } from './infrastructure/db';
-import { SimpleEventBus } from './infrastructure/eventBus';
-
-// Modules
-import { registerOrderModule }     from './modules/order';
-import { registerKitchenModule }   from './modules/kitchen';
-import { registerTableModule }     from './modules/table';
-import { registerBillingModule }   from './modules/billing';
-import { registerInventoryModule } from './modules/inventory';
-import { registerAnalyticsModule } from './modules/analytics';
-
-async function bootstrap() {
-  const app      = express();
-  const eventBus = new SimpleEventBus();
-  const PORT     = parseInt(process.env.PORT || '3000');
-
-  // ── Middleware ──────────────────────────────────────────
-  app.use(cors({
-    origin: [
-      'http://localhost:5173',  // Vite dev
-      'http://localhost:4173',  // Vite preview
-      'http://localhost:3001',  // alternate
-    ],
-    credentials: true,
-  }));
-  app.use(express.json());
-
-  // Request logger (dev)
-  app.use((req, _res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-    next();
-  });
-
-  // ── QUAN TRỌNG: Thứ tự đăng ký module ──────────────────
-  // Subscriber phải đăng ký TRƯỚC publisher để không bỏ lỡ event
-  //
-  //  ORDER_CREATED  → Kitchen, Table, Inventory cần lắng nghe
-  //  ORDER_COMPLETED→ Billing, Table cần lắng nghe
-  //  PAYMENT_COMPLETED → Table, Analytics cần lắng nghe
-  //  RAW_MATERIAL_LOW  → Order (menu) cần lắng nghe
-  //
-  // Thứ tự: Kitchen → Table → Billing → Inventory → Analytics → Order
-
-  app.use('/api', registerKitchenModule(pool, eventBus));   // lắng nghe ORDER_CREATED
-  app.use('/api', registerTableModule(pool, eventBus));     // lắng nghe ORDER_CREATED, ORDER_COMPLETED, PAYMENT_COMPLETED
-  app.use('/api', registerBillingModule(pool, eventBus));   // lắng nghe ORDER_COMPLETED; phát PAYMENT_COMPLETED
-  app.use('/api', registerInventoryModule(pool, eventBus)); // lắng nghe ORDER_CREATED; phát RAW_MATERIAL_LOW
-  app.use('/api', registerAnalyticsModule(pool, eventBus)); // lắng nghe PAYMENT_COMPLETED; xử lý auth
-  app.use('/api', registerOrderModule(pool, eventBus));     // phát ORDER_CREATED; lắng nghe RAW_MATERIAL_LOW
-
-  // ── Health check ────────────────────────────────────────
-  app.get('/health', async (_req, res) => {
-    try {
-      await pool.query('SELECT 1');
-      res.json({ status: 'ok', db: 'connected', ts: new Date().toISOString() });
-    } catch {
-      res.status(503).json({ status: 'error', db: 'disconnected' });
-    }
-  });
-
-  // ── 404 handler ─────────────────────────────────────────
-  app.use((_req, res) => {
-    res.status(404).json({ error: 'Route not found' });
-  });
-
-  // ── Global error handler ────────────────────────────────
-  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    console.error('[App] Unhandled error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  });
-
-  // ── Start ───────────────────────────────────────────────
-  app.listen(PORT, () => {
-    console.log(`\n🍽️  IRMS Backend running on http://localhost:${PORT}`);
-    console.log(`📋  API base: http://localhost:${PORT}/api`);
-    console.log(`❤️  Health:   http://localhost:${PORT}/health\n`);
-  });
-
-  // Graceful shutdown
-  process.on('SIGTERM', async () => {
-    console.log('[App] SIGTERM received, closing pool...');
-    await pool.end();
-    process.exit(0);
-  });
-}
-
-bootstrap().catch(err => {
-  console.error('[App] Failed to start:', err);
-  process.exit(1);
-});
+# location: backend/.env
 # PostgreSQL connection
 DB_HOST=localhost
 DB_PORT=5432
@@ -4785,6 +3272,8 @@ JWT_EXPIRES_IN=8h
 
 # Server
 PORT=3000
+
+// backend/package-lock.json , đây là bản cũ chỉ tham khảo
 {
   "name": "irms-backend",
   "version": "1.0.0",
@@ -6828,34 +5317,174 @@ PORT=3000
     }
   }
 }
-{
-  "name": "irms-backend",
-  "version": "1.0.0",
-  "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
-    "build": "tsc",
-    "start": "node dist/app.js",
-    "db:init": "ts-node src/infrastructure/initDb.ts"
-  },
-  "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.0",
-    "pg": "^8.11.3"
-  },
-  "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
-    "@types/jsonwebtoken": "^9.0.5",
-    "@types/node": "^20.10.0",
-    "@types/pg": "^8.10.9",
-    "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
-    "typescript": "^5.3.0"
-  }
-}
+
+// readme co be
+# IRMS Backend — Hướng dẫn chạy
+
+## Yêu cầu
+- Node.js >= 18
+- PostgreSQL >= 14 (đang chạy)
+
+---
+
+## Bước 1 — Tạo database PostgreSQL
+
+Mở psql hoặc pgAdmin, chạy:
+
+```sql
+CREATE DATABASE irms;
+```
+
+---
+
+## Bước 2 — Cấu hình .env
+
+File `.env` đã có sẵn trong thư mục `backend/`. Sửa nếu cần:
+
+```
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=irms
+DB_USER=postgres
+DB_PASSWORD=postgres   ← đổi thành password PostgreSQL của bạn
+
+JWT_SECRET=irms_super_secret_key_change_in_production
+JWT_EXPIRES_IN=8h
+PORT=3000
+```
+
+---
+
+## Bước 3 — Cài dependencies
+
+```bash
+cd irms/backend
+npm install
+```
+
+---
+
+## Bước 4 — Tạo bảng và seed data
+
+```bash
+npm run db:init
+```
+
+Lệnh này sẽ:
+- Tạo toàn bộ bảng (users, menu_items, tables, orders, kitchen_tickets, bills, revenues, ingredients, ...)
+- Seed 5 tài khoản mặc định:
+
+| Username | Password   | Role    |
+|----------|------------|---------|
+| admin    | admin123   | admin   |
+| manager  | manager123 | manager |
+| server1  | server123  | server  |
+| chef1    | chef123    | chef    |
+| casher1  | casher123  | casher  |
+
+- Seed 6 combo menu và 10 bàn (001–010)
+- Seed 15 nguyên liệu kho
+
+---
+
+## Bước 5 — Chạy dev server
+
+```bash
+npm run dev
+```
+
+Server chạy tại: **http://localhost:3000**
+
+Kiểm tra: `http://localhost:3000/health` → `{ "status": "ok", "db": "connected" }`
+
+---
+
+## Chạy Frontend song song
+
+```bash
+# Terminal 1 — Backend
+cd irms/backend && npm run dev
+
+# Terminal 2 — Frontend
+cd irms/frontend && npm install && npm run dev
+```
+
+Frontend: **http://localhost:5173**
+
+---
+
+## API Endpoints
+
+### Auth
+| Method | URL              | Role  | Mô tả         |
+|--------|------------------|-------|---------------|
+| POST   | /api/auth/login  | public| Đăng nhập     |
+
+### Menu & Orders
+| Method | URL                          | Role                        |
+|--------|------------------------------|-----------------------------|
+| GET    | /api/menu                    | all authenticated           |
+| PATCH  | /api/menu/:id/availability   | admin, manager              |
+| POST   | /api/orders                  | server, manager, admin      |
+| GET    | /api/orders/table/:tableId   | server, casher, manager, admin |
+
+### Kitchen
+| Method | URL                    | Role                   |
+|--------|------------------------|------------------------|
+| GET    | /api/kitchen/tickets   | chef, manager, admin   |
+| PATCH  | /api/kitchen/:id/start | chef, manager, admin   |
+| PATCH  | /api/kitchen/:id/done  | chef, manager, admin   |
+
+### Tables
+| Method | URL          | Role                              |
+|--------|--------------|-----------------------------------|
+| GET    | /api/tables  | server, casher, manager, admin    |
+
+### Billing
+| Method | URL                      | Role                  |
+|--------|--------------------------|-----------------------|
+| GET    | /api/billing/:tableId    | casher, manager, admin|
+| POST   | /api/billing/:billId/pay | casher, manager, admin|
+
+### Inventory
+| Method | URL                    | Role            |
+|--------|------------------------|-----------------|
+| GET    | /api/inventory         | manager, admin  |
+| PATCH  | /api/inventory/:name   | manager, admin  |
+
+### Analytics & Admin
+| Method | URL                      | Role    |
+|--------|--------------------------|---------|
+| GET    | /api/analytics/revenue   | manager, admin |
+| POST   | /api/analytics/users     | admin   |
+| GET    | /api/analytics/users     | admin   |
+
+---
+
+## Event Flow
+
+```
+[Server tạo đơn]
+  POST /api/orders
+    → ORDER_CREATED
+      ├── Kitchen:   tạo ticket (status: pending)
+      ├── Table:     bàn → occupied
+      └── Inventory: trừ kho → nếu thiếu → RAW_MATERIAL_LOW
+                                              └── Order: ẩn combo
+
+[Chef nấu xong]
+  PATCH /api/kitchen/:id/done
+    → ORDER_COMPLETED
+      ├── Table:   bàn → food_ready
+      └── Billing: tạo bill pending
+
+[Thu ngân thanh toán]
+  POST /api/billing/:billId/pay
+    → PAYMENT_COMPLETED
+      ├── Table:     bàn → available
+      └── Analytics: ghi doanh thu
+```
+// be/tsconfig.json
 {
   "compilerOptions": {
     "target": "ES2020",
@@ -6872,18 +5501,1474 @@ PORT=3000
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
+// src/infrastructure/auth.ts
+// JWT middleware + helper sign/verify
 
-// frontend/vite.config.ts
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: 5173,
-    proxy: {
-      '/api': 'http://localhost:3000'
+export type Role = 'admin' | 'manager' | 'server' | 'chef' | 'casher';
+
+export interface AuthPayload {
+  id: string;
+  role: Role;
+}
+
+// Extend Express Request
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthPayload;
     }
   }
-})
+}
+
+const SECRET = process.env.JWT_SECRET || 'irms_super_secret_key_change_in_production';
+const EXPIRES = process.env.JWT_EXPIRES_IN || '8h';
+
+export function signToken(payload: AuthPayload): string {
+  return jwt.sign(payload, SECRET, { expiresIn: EXPIRES } as jwt.SignOptions);
+}
+
+export function verifyToken(token: string): AuthPayload {
+  return jwt.verify(token, SECRET) as AuthPayload;
+}
+
+// Middleware: xác thực JWT
+export function authenticate(req: Request, res: Response, next: NextFunction): void {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Missing token' });
+    return;
+  }
+  try {
+    req.user = verifyToken(header.slice(7));
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+// Middleware factory: kiểm tra role
+export function authorize(...roles: Role[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+    next();
+  };
+}
+// src/infrastructure/db.ts
+// PostgreSQL connection pool — singleton, dùng chung toàn app
+import { Pool } from 'pg';
+
+// Load .env thủ công (không dùng dotenv package)
+import * as fs from 'fs';
+import * as path from 'path';
+
+function loadEnv() {
+  const envPath = path.join(__dirname, '../../.env');
+  if (!fs.existsSync(envPath)) return;
+  const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const [key, ...rest] = trimmed.split('=');
+    if (key && !process.env[key]) {
+      process.env[key] = rest.join('=').trim();
+    }
+  }
+}
+loadEnv();
+
+export const pool = new Pool({
+  host:     process.env.DB_HOST     || 'localhost',
+  port:     parseInt(process.env.DB_PORT || '5432'),
+  database: process.env.DB_NAME     || 'irms',
+  user:     process.env.DB_USER     || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres',
+  max: 20,          // max 20 connections — đủ cho peak hours
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
+
+pool.on('error', (err) => {
+  console.error('[DB] Unexpected error on idle client', err);
+});
+// src/infrastructure/eventBus.ts
+// In-process event bus — đủ dùng cho service-based architecture
+// Nếu scale lên microservices thì thay bằng Redis Pub/Sub hoặc RabbitMQ
+
+type Handler = (payload: unknown) => void | Promise<void>;
+
+export class SimpleEventBus {
+  private handlers: Map<string, Handler[]> = new Map();
+
+  subscribe(event: string, handler: Handler): void {
+    if (!this.handlers.has(event)) {
+      this.handlers.set(event, []);
+    }
+    this.handlers.get(event)!.push(handler);
+    console.log(`[EventBus] Subscribed to "${event}"`);
+  }
+
+  async publish(event: string, payload: unknown): Promise<void> {
+    const handlers = this.handlers.get(event) ?? [];
+    if (handlers.length === 0) {
+      console.warn(`[EventBus] No handlers for "${event}"`);
+      return;
+    }
+    console.log(`[EventBus] Publishing "${event}" to ${handlers.length} handler(s)`);
+    // Chạy song song tất cả handlers
+    await Promise.allSettled(
+      handlers.map(h =>
+        Promise.resolve(h(payload)).catch(err =>
+          console.error(`[EventBus] Handler error for "${event}":`, err)
+        )
+      )
+    );
+  }
+}
+// src/infrastructure/initDb.ts
+// Chạy một lần để tạo bảng + seed data mẫu
+// Lệnh: npm run db:init
+
+import { pool } from './db';
+import bcrypt from 'bcryptjs';
+
+async function initDb() {
+  const client = await pool.connect();
+  try {
+    console.log('[InitDB] Creating tables...');
+
+    await client.query(`
+      -- Extensions
+      CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+      -- Users
+      CREATE TABLE IF NOT EXISTS users (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        username   VARCHAR(50) UNIQUE NOT NULL,
+        password   TEXT NOT NULL,
+        role       VARCHAR(20) NOT NULL CHECK (role IN ('admin','manager','server','chef','casher')),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Menu items (combo)
+      CREATE TABLE IF NOT EXISTS menu_items (
+        id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name         VARCHAR(100) NOT NULL,
+        price        INTEGER NOT NULL,   -- đơn vị: VND
+        is_available BOOLEAN DEFAULT TRUE,
+        created_at   TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Dishes (món ăn trong combo)
+      CREATE TABLE IF NOT EXISTS dishes (
+        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name          VARCHAR(100) NOT NULL,
+        category      VARCHAR(50),  -- ngọt/mặn/...
+        cooking_method VARCHAR(50)  -- nướng/xào/chiên/...
+      );
+
+      -- Combo → Dish mapping
+      CREATE TABLE IF NOT EXISTS combo_dishes (
+        combo_id  UUID REFERENCES menu_items(id) ON DELETE CASCADE,
+        dish_id   UUID REFERENCES dishes(id)     ON DELETE CASCADE,
+        PRIMARY KEY (combo_id, dish_id)
+      );
+
+      -- Ingredients (nguyên liệu kho)
+      CREATE TABLE IF NOT EXISTS ingredients (
+        id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name      VARCHAR(100) UNIQUE NOT NULL,
+        quantity  NUMERIC(10,2) NOT NULL DEFAULT 0,
+        unit      VARCHAR(20) NOT NULL,
+        threshold NUMERIC(10,2) NOT NULL DEFAULT 0
+      );
+
+      -- Dish → Ingredient mapping (số lượng cần để nấu 1 đơn vị dish)
+      CREATE TABLE IF NOT EXISTS dish_ingredients (
+        dish_id         UUID REFERENCES dishes(id) ON DELETE CASCADE,
+        ingredient_name VARCHAR(100) NOT NULL,
+        qty_needed      NUMERIC(10,2) NOT NULL,
+        unit            VARCHAR(20)   NOT NULL,
+        PRIMARY KEY (dish_id, ingredient_name)
+      );
+
+      -- Tables (bàn ăn)
+      CREATE TABLE IF NOT EXISTS tables (
+        id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        table_number VARCHAR(10) UNIQUE NOT NULL,
+        status       VARCHAR(20) DEFAULT 'available'
+                     CHECK (status IN ('available','occupied','food_ready'))
+      );
+
+      -- Orders
+      CREATE TABLE IF NOT EXISTS orders (
+        id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        table_id    VARCHAR(20) NOT NULL,
+        combo_id    UUID REFERENCES menu_items(id),
+        combo_name  VARCHAR(100) NOT NULL,
+        quantity    INTEGER NOT NULL DEFAULT 1,
+        notes       TEXT DEFAULT '',
+        total_price INTEGER NOT NULL,
+        status      VARCHAR(20) DEFAULT 'pending'
+                    CHECK (status IN ('pending','cooking','done')),
+        created_at  TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Kitchen tickets
+      CREATE TABLE IF NOT EXISTS kitchen_tickets (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        order_id   UUID REFERENCES orders(id) ON DELETE CASCADE,
+        table_id   VARCHAR(20) NOT NULL,
+        combo_name VARCHAR(100) NOT NULL,
+        quantity   INTEGER NOT NULL,
+        notes      TEXT DEFAULT '',
+        status     VARCHAR(20) DEFAULT 'pending'
+                   CHECK (status IN ('pending','cooking','done')),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Bills
+      CREATE TABLE IF NOT EXISTS bills (
+        id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        order_id     UUID REFERENCES orders(id),
+        table_id     VARCHAR(20) NOT NULL,
+        total_amount INTEGER NOT NULL,
+        status       VARCHAR(20) DEFAULT 'pending'
+                     CHECK (status IN ('pending','paid')),
+        created_at   TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Revenue records
+      CREATE TABLE IF NOT EXISTS revenues (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        bill_id    UUID REFERENCES bills(id),
+        amount     INTEGER NOT NULL,
+        date       DATE NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    console.log('[InitDB] Tables created. Seeding data...');
+
+    // Seed admin user
+    const adminHash = await bcrypt.hash('admin123', 10);
+    const managerHash = await bcrypt.hash('manager123', 10);
+    const serverHash = await bcrypt.hash('server123', 10);
+    const chefHash = await bcrypt.hash('chef123', 10);
+    const casherHash = await bcrypt.hash('casher123', 10);
+
+    await client.query(`
+      INSERT INTO users (username, password, role) VALUES
+        ('admin',   $1, 'admin'),
+        ('manager', $2, 'manager'),
+        ('server1', $3, 'server'),
+        ('chef1',   $4, 'chef'),
+        ('casher1', $5, 'casher')
+      ON CONFLICT (username) DO NOTHING;
+    `, [adminHash, managerHash, serverHash, chefHash, casherHash]);
+
+    // Seed menu items
+    await client.query(`
+      INSERT INTO menu_items (id, name, price, is_available) VALUES
+        ('a1b2c3d4-0000-0000-0000-000000000001', 'Combo Gà Hàn Quốc',     130000, true),
+        ('a1b2c3d4-0000-0000-0000-000000000002', 'Combo Gogi Bò Nướng',   180000, true),
+        ('a1b2c3d4-0000-0000-0000-000000000003', 'Combo Phở Đặc Biệt',    95000,  true),
+        ('a1b2c3d4-0000-0000-0000-000000000004', 'Combo Trẻ Em Khuyến Mãi',65000,  true),
+        ('a1b2c3d4-0000-0000-0000-000000000005', 'Combo Hải Sản Cao Cấp', 250000, true),
+        ('a1b2c3d4-0000-0000-0000-000000000006', 'Combo Chay Thanh Đạm',  80000,  true)
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
+    // Seed tables (10 bàn)
+    await client.query(`
+      INSERT INTO tables (table_number, status) VALUES
+        ('001', 'available'), ('002', 'available'), ('003', 'available'),
+        ('004', 'available'), ('005', 'available'), ('006', 'available'),
+        ('007', 'available'), ('008', 'available'), ('009', 'available'),
+        ('010', 'available')
+      ON CONFLICT (table_number) DO NOTHING;
+    `);
+
+    // Seed ingredients
+    await client.query(`
+      INSERT INTO ingredients (name, quantity, unit, threshold) VALUES
+        ('Gà',          50,    'kg',  10),
+        ('Bò',          30,    'kg',  8),
+        ('Rau muống',   100,   'bó',  20),
+        ('Dầu ăn',      20000, 'ml',  3000),
+        ('Tỏi',         5000,  'g',   500),
+        ('Hành',        3000,  'g',   400),
+        ('Bún/Phở',     80,    'kg',  15),
+        ('Xương hầm',   25,    'kg',  5),
+        ('Tôm',         20,    'kg',  5),
+        ('Mực',         15,    'kg',  4),
+        ('Rau cải',     60,    'bó',  10),
+        ('Đậu hũ',      40,    'kg',  8),
+        ('Nước mắm',    10000, 'ml',  1000),
+        ('Muối',        5000,  'g',   500),
+        ('Đường',       3000,  'g',   300)
+      ON CONFLICT (name) DO NOTHING;
+    `);
+
+    console.log('[InitDB] ✅ Done! Default accounts:');
+    console.log('  admin   / admin123');
+    console.log('  manager / manager123');
+    console.log('  server1 / server123');
+    console.log('  chef1   / chef123');
+    console.log('  casher1 / casher123');
+
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+initDb().catch(err => {
+  console.error('[InitDB] FAILED:', err);
+  process.exit(1);
+});
+// src/modules/analytics/index.ts
+// Module Analytics & Admin — doanh thu + quản lý user
+
+import { Router, Request, Response } from 'express';
+import { Pool } from 'pg';
+import bcrypt from 'bcryptjs';
+import { SimpleEventBus } from '../../infrastructure/eventBus';
+import { authenticate, authorize, signToken } from '../../infrastructure/auth';
+import { EVENTS, PaymentCompletedPayload } from '../../shared/events';
+import type { Role } from '../../infrastructure/auth';
+
+// ─── Models ───────────────────────────────────────────────
+interface User {
+  id: string;
+  username: string;
+  role: Role;
+  createdAt: string;
+}
+
+interface Revenue {
+  id: string;
+  billId: string;
+  amount: number;
+  date: string;
+}
+
+// ─── Repository ───────────────────────────────────────────
+class AnalyticsRepository {
+  constructor(private db: Pool) {}
+
+  async saveRevenue(billId: string, amount: number, date: string): Promise<void> {
+    await this.db.query(
+      `INSERT INTO revenues (bill_id, amount, date) VALUES ($1, $2, $3)`,
+      [billId, amount, date]
+    );
+  }
+
+  async getDailyRevenue(date: string): Promise<number> {
+    const { rows } = await this.db.query(
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM revenues WHERE date = $1`,
+      [date]
+    );
+    return parseInt(rows[0]?.total ?? '0', 10);
+  }
+
+  async findUserByUsername(username: string): Promise<{ id: string; username: string; role: Role; password: string } | null> {
+    const { rows } = await this.db.query(
+      `SELECT id, username, role, password FROM users WHERE username = $1`,
+      [username]
+    );
+    return rows[0] ?? null;
+  }
+
+  async createUser(username: string, hashedPassword: string, role: Role): Promise<User> {
+    const { rows } = await this.db.query(
+      `INSERT INTO users (username, password, role)
+       VALUES ($1, $2, $3)
+       RETURNING id, username, role, created_at AS "createdAt"`,
+      [username, hashedPassword, role]
+    );
+    return rows[0];
+  }
+
+  async listUsers(): Promise<User[]> {
+    const { rows } = await this.db.query(
+      `SELECT id, username, role, created_at AS "createdAt" FROM users ORDER BY created_at DESC`
+    );
+    return rows;
+  }
+}
+
+// ─── Service ──────────────────────────────────────────────
+class AnalyticsService {
+  constructor(
+    private repo: AnalyticsRepository,
+    private eventBus: SimpleEventBus
+  ) {}
+
+  async login(username: string, password: string): Promise<string> {
+    const user = await this.repo.findUserByUsername(username);
+    if (!user) throw new Error('Invalid credentials');
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) throw new Error('Invalid credentials');
+
+    return signToken({ id: user.id, role: user.role });
+  }
+
+  async getDailyRevenue(date: string): Promise<{ date: string; total: number }> {
+    const total = await this.repo.getDailyRevenue(date);
+    return { date, total };
+  }
+
+  async createUser(data: { username: string; password: string; role: Role }): Promise<User> {
+    const existing = await this.repo.findUserByUsername(data.username);
+    if (existing) throw new Error(`Username "${data.username}" already exists`);
+
+    const hashed = await bcrypt.hash(data.password, 10);
+    return this.repo.createUser(data.username, hashed, data.role);
+  }
+
+  async listUsers(): Promise<User[]> {
+    return this.repo.listUsers();
+  }
+
+  registerEventHandlers(): void {
+    // PAYMENT_COMPLETED → ghi nhận doanh thu
+    this.eventBus.subscribe(EVENTS.PAYMENT_COMPLETED, async (raw) => {
+      const payload = raw as PaymentCompletedPayload;
+      console.log(`[Analytics] PAYMENT_COMPLETED → recording revenue ${payload.amount} on ${payload.date}`);
+      await this.repo.saveRevenue(payload.billId, payload.amount, payload.date);
+    });
+  }
+}
+
+// ─── Controller / Router ──────────────────────────────────
+export function registerAnalyticsModule(db: Pool, eventBus: SimpleEventBus): Router {
+  const router  = Router();
+  const repo    = new AnalyticsRepository(db);
+  const service = new AnalyticsService(repo, eventBus);
+
+  service.registerEventHandlers();
+
+  // POST /auth/login — public
+  router.post('/auth/login', async (req: Request, res: Response) => {
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) {
+        res.status(400).json({ error: 'username and password required' });
+        return;
+      }
+      const token = await service.login(username, password);
+      res.json({ token });
+    } catch (e: any) {
+      res.status(401).json({ error: e.message });
+    }
+  });
+
+  // GET /analytics/revenue?date=YYYY-MM-DD — manager, admin
+  router.get('/analytics/revenue',
+    authenticate, authorize('manager', 'admin'),
+    async (req: Request, res: Response) => {
+      try {
+        const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+        res.json(await service.getDailyRevenue(date));
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  );
+
+  // POST /analytics/users — admin only
+  router.post('/analytics/users',
+    authenticate, authorize('admin'),
+    async (req: Request, res: Response) => {
+      try {
+        const { username, password, role } = req.body;
+        if (!username || !password || !role) {
+          res.status(400).json({ error: 'username, password, role required' });
+          return;
+        }
+        const user = await service.createUser({ username, password, role });
+        res.status(201).json(user);
+      } catch (e: any) {
+        res.status(400).json({ error: e.message });
+      }
+    }
+  );
+
+  // GET /analytics/users — admin only
+  router.get('/analytics/users',
+    authenticate, authorize('admin'),
+    async (_req: Request, res: Response) => {
+      try {
+        res.json(await service.listUsers());
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  );
+
+  return router;
+}
+// src/modules/billing/index.ts
+// Module Billing & Payment
+
+import { Router, Request, Response } from 'express';
+import { Pool } from 'pg';
+import { SimpleEventBus } from '../../infrastructure/eventBus';
+import { authenticate, authorize } from '../../infrastructure/auth';
+import {
+  EVENTS,
+  OrderCompletedPayload,
+  PaymentCompletedPayload,
+} from '../../shared/events';
+
+// ─── Models ───────────────────────────────────────────────
+interface Bill {
+  id: string;
+  orderId: string;
+  tableId: string;
+  totalAmount: number;
+  status: 'pending' | 'paid';
+  createdAt: string;
+}
+
+// ─── Repository ───────────────────────────────────────────
+class BillingRepository {
+  constructor(private db: Pool) {}
+
+  async createBill(orderId: string, tableId: string, totalAmount: number): Promise<Bill> {
+    // Nếu bill cho order này đã tồn tại (idempotent), trả về cái cũ
+    const existing = await this.db.query(
+      `SELECT id, order_id AS "orderId", table_id AS "tableId",
+              total_amount AS "totalAmount", status, created_at AS "createdAt"
+       FROM bills WHERE order_id = $1 AND status = 'pending'`,
+      [orderId]
+    );
+    if (existing.rows[0]) return existing.rows[0];
+
+    const { rows } = await this.db.query(
+      `INSERT INTO bills (order_id, table_id, total_amount, status)
+       VALUES ($1, $2, $3, 'pending')
+       RETURNING id, order_id AS "orderId", table_id AS "tableId",
+                 total_amount AS "totalAmount", status, created_at AS "createdAt"`,
+      [orderId, tableId, totalAmount]
+    );
+    return rows[0];
+  }
+
+  async findPendingByTable(tableId: string): Promise<Bill | null> {
+    const { rows } = await this.db.query(
+      `SELECT b.id, b.order_id AS "orderId", b.table_id AS "tableId",
+              b.total_amount AS "totalAmount", b.status, b.created_at AS "createdAt"
+       FROM bills b
+       WHERE b.table_id = $1 AND b.status = 'pending'
+       ORDER BY b.created_at DESC LIMIT 1`,
+      [tableId]
+    );
+    return rows[0] ?? null;
+  }
+
+  async findById(id: string): Promise<Bill | null> {
+    const { rows } = await this.db.query(
+      `SELECT id, order_id AS "orderId", table_id AS "tableId",
+              total_amount AS "totalAmount", status, created_at AS "createdAt"
+       FROM bills WHERE id = $1`,
+      [id]
+    );
+    return rows[0] ?? null;
+  }
+
+  async markPaid(id: string): Promise<Bill | null> {
+    const { rows } = await this.db.query(
+      `UPDATE bills SET status = 'paid' WHERE id = $1
+       RETURNING id, order_id AS "orderId", table_id AS "tableId",
+                 total_amount AS "totalAmount", status, created_at AS "createdAt"`,
+      [id]
+    );
+    return rows[0] ?? null;
+  }
+
+  // Lấy total_price từ order để tạo bill khi nhận event
+  async getOrderTotalPrice(orderId: string): Promise<{ totalPrice: number; tableId: string } | null> {
+    const { rows } = await this.db.query(
+      `SELECT total_price AS "totalPrice", table_id AS "tableId"
+       FROM orders WHERE id = $1`,
+      [orderId]
+    );
+    return rows[0] ?? null;
+  }
+}
+
+// ─── Service ──────────────────────────────────────────────
+class BillingService {
+  constructor(
+    private repo: BillingRepository,
+    private eventBus: SimpleEventBus
+  ) {}
+
+  async getBillByTable(tableId: string): Promise<Bill | null> {
+    return this.repo.findPendingByTable(tableId);
+  }
+
+  async pay(billId: string): Promise<Bill> {
+    const bill = await this.repo.markPaid(billId);
+    if (!bill) throw new Error(`Bill ${billId} not found or already paid`);
+
+    const payload: PaymentCompletedPayload = {
+      billId:  bill.id,
+      tableId: bill.tableId,
+      amount:  bill.totalAmount,
+      date:    new Date().toISOString().slice(0, 10),
+    };
+    await this.eventBus.publish(EVENTS.PAYMENT_COMPLETED, payload);
+
+    return bill;
+  }
+
+  registerEventHandlers(): void {
+    // ORDER_COMPLETED → tạo bill sẵn cho thu ngân
+    this.eventBus.subscribe(EVENTS.ORDER_COMPLETED, async (raw) => {
+      const payload = raw as OrderCompletedPayload;
+      console.log(`[Billing] ORDER_COMPLETED → creating bill for order ${payload.orderId}`);
+
+      const orderInfo = await this.repo.getOrderTotalPrice(payload.orderId);
+      if (!orderInfo) {
+        console.error(`[Billing] Order ${payload.orderId} not found`);
+        return;
+      }
+      await this.repo.createBill(payload.orderId, orderInfo.tableId, orderInfo.totalPrice);
+    });
+  }
+}
+
+// ─── Controller / Router ──────────────────────────────────
+export function registerBillingModule(db: Pool, eventBus: SimpleEventBus): Router {
+  const router  = Router();
+  const repo    = new BillingRepository(db);
+  const service = new BillingService(repo, eventBus);
+
+  service.registerEventHandlers();
+
+  // GET /billing/:tableId — casher, manager, admin
+  router.get('/billing/:tableId',
+    authenticate, authorize('casher', 'manager', 'admin'),
+    async (req: Request, res: Response) => {
+      try {
+        const bill = await service.getBillByTable(req.params.tableId);
+        if (!bill) {
+          res.status(404).json({ error: 'No pending bill for this table' });
+          return;
+        }
+        res.json(bill);
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  );
+
+  // POST /billing/:billId/pay — casher, manager, admin
+  router.post('/billing/:billId/pay',
+    authenticate, authorize('casher', 'manager', 'admin'),
+    async (req: Request, res: Response) => {
+      try {
+        res.json(await service.pay(req.params.billId));
+      } catch (e: any) {
+        res.status(400).json({ error: e.message });
+      }
+    }
+  );
+
+  return router;
+}
+// src/modules/inventory/index.ts
+// Module Inventory — kho nguyên liệu
+
+import { Router, Request, Response } from 'express';
+import { Pool } from 'pg';
+import { SimpleEventBus } from '../../infrastructure/eventBus';
+import { authenticate, authorize } from '../../infrastructure/auth';
+import { EVENTS, OrderCreatedPayload, RawMaterialLowPayload } from '../../shared/events';
+
+// ─── Models ───────────────────────────────────────────────
+interface Ingredient {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  threshold: number;
+}
+
+// ─── Repository ───────────────────────────────────────────
+class InventoryRepository {
+  constructor(private db: Pool) {}
+
+  async findAll(): Promise<Ingredient[]> {
+    const { rows } = await this.db.query(
+      `SELECT id, name, quantity, unit, threshold FROM ingredients ORDER BY name`
+    );
+    return rows;
+  }
+
+  async updateQuantity(name: string, quantity: number): Promise<Ingredient | null> {
+    const { rows } = await this.db.query(
+      `UPDATE ingredients SET quantity = $1 WHERE name = $2
+       RETURNING id, name, quantity, unit, threshold`,
+      [quantity, name]
+    );
+    return rows[0] ?? null;
+  }
+
+  // Trừ nguyên liệu khi có ORDER_CREATED
+  // Lấy danh sách nguyên liệu cần cho combo (qua combo_dishes → dish_ingredients)
+  async deductForCombo(comboId: string, comboQuantity: number): Promise<void> {
+    // Lấy tất cả nguyên liệu cần cho combo này
+    const { rows } = await this.db.query(
+      `SELECT di.ingredient_name, SUM(di.qty_needed * $2) AS total_needed
+       FROM combo_dishes cd
+       JOIN dish_ingredients di ON di.dish_id = cd.dish_id
+       WHERE cd.combo_id = $1
+       GROUP BY di.ingredient_name`,
+      [comboId, comboQuantity]
+    );
+
+    for (const row of rows) {
+      await this.db.query(
+        `UPDATE ingredients
+         SET quantity = GREATEST(0, quantity - $1)
+         WHERE name = $2`,
+        [row.total_needed, row.ingredient_name]
+      );
+    }
+  }
+
+  // Tìm nguyên liệu dưới ngưỡng sau khi trừ
+  async findBelowThreshold(): Promise<Ingredient[]> {
+    const { rows } = await this.db.query(
+      `SELECT id, name, quantity, unit, threshold
+       FROM ingredients WHERE quantity <= threshold`
+    );
+    return rows;
+  }
+
+  async findByName(name: string): Promise<Ingredient | null> {
+    const { rows } = await this.db.query(
+      `SELECT id, name, quantity, unit, threshold
+       FROM ingredients WHERE name = $1`,
+      [name]
+    );
+    return rows[0] ?? null;
+  }
+}
+
+// ─── Service ──────────────────────────────────────────────
+class InventoryService {
+  constructor(
+    private repo: InventoryRepository,
+    private eventBus: SimpleEventBus
+  ) {}
+
+  async getAll(): Promise<Ingredient[]> {
+    return this.repo.findAll();
+  }
+
+  async updateQuantity(name: string, quantity: number): Promise<Ingredient | null> {
+    return this.repo.updateQuantity(name, quantity);
+  }
+
+  registerEventHandlers(): void {
+    // ORDER_CREATED → trừ kho, kiểm tra ngưỡng
+    this.eventBus.subscribe(EVENTS.ORDER_CREATED, async (raw) => {
+      const payload = raw as OrderCreatedPayload;
+      console.log(`[Inventory] ORDER_CREATED → deducting for combo ${payload.comboId} x${payload.quantity}`);
+
+      await this.repo.deductForCombo(payload.comboId, payload.quantity);
+
+      // Kiểm tra ngưỡng sau khi trừ
+      const lowItems = await this.repo.findBelowThreshold();
+      for (const item of lowItems) {
+        const lowPayload: RawMaterialLowPayload = {
+          ingredientName: item.name,
+          currentQty:     item.quantity,
+          threshold:      item.threshold,
+        };
+        console.warn(`[Inventory] LOW STOCK: ${item.name} = ${item.quantity} ${item.unit} (threshold: ${item.threshold})`);
+        await this.eventBus.publish(EVENTS.RAW_MATERIAL_LOW, lowPayload);
+      }
+    });
+  }
+}
+
+// ─── Controller / Router ──────────────────────────────────
+export function registerInventoryModule(db: Pool, eventBus: SimpleEventBus): Router {
+  const router  = Router();
+  const repo    = new InventoryRepository(db);
+  const service = new InventoryService(repo, eventBus);
+
+  service.registerEventHandlers();
+
+  // GET /inventory — manager, admin
+  router.get('/inventory',
+    authenticate, authorize('manager', 'admin'),
+    async (_req: Request, res: Response) => {
+      try {
+        res.json(await service.getAll());
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  );
+
+  // PATCH /inventory/:name — manager, admin
+  router.patch('/inventory/:name',
+    authenticate, authorize('manager', 'admin'),
+    async (req: Request, res: Response) => {
+      try {
+        const item = await service.updateQuantity(
+          decodeURIComponent(req.params.name),
+          req.body.quantity
+        );
+        if (!item) {
+          res.status(404).json({ error: 'Ingredient not found' });
+          return;
+        }
+        res.json(item);
+      } catch (e: any) {
+        res.status(400).json({ error: e.message });
+      }
+    }
+  );
+
+  return router;
+}
+// src/modules/kitchen/index.ts
+// Module Kitchen Display System (KDS)
+
+import { Router, Request, Response } from 'express';
+import { Pool } from 'pg';
+import { SimpleEventBus } from '../../infrastructure/eventBus';
+import { authenticate, authorize } from '../../infrastructure/auth';
+import { EVENTS, OrderCreatedPayload, OrderCompletedPayload } from '../../shared/events';
+
+// ─── Models ───────────────────────────────────────────────
+interface KitchenTicket {
+  id: string;
+  orderId: string;
+  tableId: string;
+  comboName: string;
+  quantity: number;
+  notes: string;
+  status: 'pending' | 'cooking' | 'done';
+  createdAt: string;
+}
+
+// ─── Repository ───────────────────────────────────────────
+class KitchenRepository {
+  constructor(private db: Pool) {}
+
+  async saveTicket(payload: OrderCreatedPayload): Promise<KitchenTicket> {
+    const { rows } = await this.db.query(
+      `INSERT INTO kitchen_tickets (order_id, table_id, combo_name, quantity, notes, status)
+       VALUES ($1, $2, $3, $4, $5, 'pending')
+       RETURNING id, order_id AS "orderId", table_id AS "tableId",
+                 combo_name AS "comboName", quantity, notes, status,
+                 created_at AS "createdAt"`,
+      [payload.orderId, payload.tableId, payload.comboName, payload.quantity, payload.notes]
+    );
+    return rows[0];
+  }
+
+  async getActiveTickets(): Promise<KitchenTicket[]> {
+    const { rows } = await this.db.query(
+      `SELECT id, order_id AS "orderId", table_id AS "tableId",
+              combo_name AS "comboName", quantity, notes, status,
+              created_at AS "createdAt"
+       FROM kitchen_tickets
+       WHERE status IN ('pending', 'cooking')
+       ORDER BY created_at ASC`
+    );
+    return rows;
+  }
+
+  async updateStatus(id: string, status: KitchenTicket['status']): Promise<KitchenTicket | null> {
+    const { rows } = await this.db.query(
+      `UPDATE kitchen_tickets SET status = $1 WHERE id = $2
+       RETURNING id, order_id AS "orderId", table_id AS "tableId",
+                 combo_name AS "comboName", quantity, notes, status,
+                 created_at AS "createdAt"`,
+      [status, id]
+    );
+    return rows[0] ?? null;
+  }
+
+  async findById(id: string): Promise<KitchenTicket | null> {
+    const { rows } = await this.db.query(
+      `SELECT id, order_id AS "orderId", table_id AS "tableId",
+              combo_name AS "comboName", quantity, notes, status,
+              created_at AS "createdAt"
+       FROM kitchen_tickets WHERE id = $1`,
+      [id]
+    );
+    return rows[0] ?? null;
+  }
+}
+
+// ─── Service ──────────────────────────────────────────────
+class KitchenService {
+  constructor(
+    private repo: KitchenRepository,
+    private eventBus: SimpleEventBus
+  ) {}
+
+  async getActiveTickets(): Promise<KitchenTicket[]> {
+    return this.repo.getActiveTickets();
+  }
+
+  async startCooking(id: string): Promise<KitchenTicket> {
+    const ticket = await this.repo.updateStatus(id, 'cooking');
+    if (!ticket) throw new Error(`Ticket ${id} not found`);
+    return ticket;
+  }
+
+  async markDone(id: string): Promise<KitchenTicket> {
+    const ticket = await this.repo.updateStatus(id, 'done');
+    if (!ticket) throw new Error(`Ticket ${id} not found`);
+
+    // Phát event ORDER_COMPLETED cho Table + Billing
+    const payload: OrderCompletedPayload = {
+      orderId: ticket.orderId,
+      tableId: ticket.tableId,
+    };
+    await this.eventBus.publish(EVENTS.ORDER_COMPLETED, payload);
+
+    return ticket;
+  }
+
+  registerEventHandlers(): void {
+    // Lắng nghe ORDER_CREATED → tạo ticket
+    this.eventBus.subscribe(EVENTS.ORDER_CREATED, async (raw) => {
+      const payload = raw as OrderCreatedPayload;
+      console.log(`[Kitchen] ORDER_CREATED → creating ticket for order ${payload.orderId}`);
+      await this.repo.saveTicket(payload);
+    });
+  }
+}
+
+// ─── Controller / Router ──────────────────────────────────
+export function registerKitchenModule(db: Pool, eventBus: SimpleEventBus): Router {
+  const router  = Router();
+  const repo    = new KitchenRepository(db);
+  const service = new KitchenService(repo, eventBus);
+
+  service.registerEventHandlers();
+
+  // GET /kitchen/tickets — chef, manager, admin
+  router.get('/kitchen/tickets',
+    authenticate, authorize('chef', 'manager', 'admin'),
+    async (_req: Request, res: Response) => {
+      try {
+        res.json(await service.getActiveTickets());
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  );
+
+  // PATCH /kitchen/:id/start — chef, manager, admin
+  router.patch('/kitchen/:id/start',
+    authenticate, authorize('chef', 'manager', 'admin'),
+    async (req: Request, res: Response) => {
+      try {
+        res.json(await service.startCooking(req.params.id));
+      } catch (e: any) {
+        res.status(400).json({ error: e.message });
+      }
+    }
+  );
+
+  // PATCH /kitchen/:id/done — chef, manager, admin
+  router.patch('/kitchen/:id/done',
+    authenticate, authorize('chef', 'manager', 'admin'),
+    async (req: Request, res: Response) => {
+      try {
+        res.json(await service.markDone(req.params.id));
+      } catch (e: any) {
+        res.status(400).json({ error: e.message });
+      }
+    }
+  );
+
+  return router;
+}
+// src/modules/order/index.ts
+// Module Order & Menu — đầy đủ models, repo, service, controller, router
+
+import { Router, Request, Response } from 'express';
+import { Pool } from 'pg';
+import { SimpleEventBus } from '../../infrastructure/eventBus';
+import { authenticate, authorize } from '../../infrastructure/auth';
+import { EVENTS, OrderCreatedPayload } from '../../shared/events';
+
+// ─── Models ───────────────────────────────────────────────
+interface MenuItem {
+  id: string;
+  name: string;
+  price: number;
+  isAvailable: boolean;
+}
+
+interface Order {
+  id: string;
+  tableId: string;
+  comboId: string;
+  comboName: string;
+  quantity: number;
+  notes: string;
+  totalPrice: number;
+  status: 'pending' | 'cooking' | 'done';
+  createdAt: string;
+}
+
+interface CreateOrderDto {
+  tableId: string;
+  comboId: string;
+  quantity: number;
+  notes: string;
+}
+
+// ─── Repository ───────────────────────────────────────────
+class MenuRepository {
+  constructor(private db: Pool) {}
+
+  async findAll(): Promise<MenuItem[]> {
+    const { rows } = await this.db.query(
+      `SELECT id, name, price, is_available AS "isAvailable" FROM menu_items ORDER BY name`
+    );
+    return rows;
+  }
+
+  async findById(id: string): Promise<MenuItem | null> {
+    const { rows } = await this.db.query(
+      `SELECT id, name, price, is_available AS "isAvailable" FROM menu_items WHERE id = $1`,
+      [id]
+    );
+    return rows[0] ?? null;
+  }
+
+  async setAvailability(id: string, isAvailable: boolean): Promise<void> {
+    await this.db.query(
+      `UPDATE menu_items SET is_available = $1 WHERE id = $2`,
+      [isAvailable, id]
+    );
+  }
+
+  // Đặt unavailable khi nguyên liệu thiếu
+  async setUnavailableByIngredient(ingredientName: string): Promise<void> {
+    // Tìm tất cả combo dùng nguyên liệu này (qua dish_ingredients → combo_dishes)
+    await this.db.query(`
+      UPDATE menu_items SET is_available = false
+      WHERE id IN (
+        SELECT DISTINCT cd.combo_id
+        FROM combo_dishes cd
+        JOIN dish_ingredients di ON di.dish_id = cd.dish_id
+        WHERE di.ingredient_name = $1
+      )
+    `, [ingredientName]);
+  }
+}
+
+class OrderRepository {
+  constructor(private db: Pool) {}
+
+  async save(dto: CreateOrderDto, comboName: string, totalPrice: number): Promise<Order> {
+    const { rows } = await this.db.query(
+      `INSERT INTO orders (table_id, combo_id, combo_name, quantity, notes, total_price, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+       RETURNING id, table_id AS "tableId", combo_id AS "comboId",
+                 combo_name AS "comboName", quantity, notes,
+                 total_price AS "totalPrice", status,
+                 created_at AS "createdAt"`,
+      [dto.tableId, dto.comboId, comboName, dto.quantity, dto.notes || '', totalPrice]
+    );
+    return rows[0];
+  }
+
+  async findByTable(tableId: string): Promise<Order[]> {
+    const { rows } = await this.db.query(
+      `SELECT id, table_id AS "tableId", combo_id AS "comboId",
+              combo_name AS "comboName", quantity, notes,
+              total_price AS "totalPrice", status,
+              created_at AS "createdAt"
+       FROM orders WHERE table_id = $1 ORDER BY created_at DESC`,
+      [tableId]
+    );
+    return rows;
+  }
+
+  async updateStatus(id: string, status: Order['status']): Promise<void> {
+    await this.db.query(`UPDATE orders SET status = $1 WHERE id = $2`, [status, id]);
+  }
+}
+
+// ─── Service ──────────────────────────────────────────────
+class OrderService {
+  constructor(
+    private menuRepo: MenuRepository,
+    private orderRepo: OrderRepository,
+    private eventBus: SimpleEventBus
+  ) {}
+
+  async getMenu(): Promise<MenuItem[]> {
+    return this.menuRepo.findAll();
+  }
+
+  async setMenuAvailability(id: string, isAvailable: boolean): Promise<void> {
+    return this.menuRepo.setAvailability(id, isAvailable);
+  }
+
+  async createOrder(dto: CreateOrderDto): Promise<Order> {
+    const combo = await this.menuRepo.findById(dto.comboId);
+    if (!combo) throw new Error(`Combo ${dto.comboId} not found`);
+    if (!combo.isAvailable) throw new Error(`Combo "${combo.name}" is not available`);
+
+    const totalPrice = combo.price * dto.quantity;
+    const order = await this.orderRepo.save(dto, combo.name, totalPrice);
+
+    // Phát event cho Kitchen, Table, Inventory
+    const payload: OrderCreatedPayload = {
+      orderId:    order.id,
+      tableId:    order.tableId,
+      comboId:    order.comboId,
+      comboName:  order.comboName,
+      quantity:   order.quantity,
+      notes:      order.notes,
+      totalPrice: order.totalPrice,
+    };
+    await this.eventBus.publish(EVENTS.ORDER_CREATED, payload);
+
+    return order;
+  }
+
+  async getOrdersByTable(tableId: string): Promise<Order[]> {
+    return this.orderRepo.findByTable(tableId);
+  }
+
+  // Handler: nhận RAW_MATERIAL_LOW từ Inventory
+  registerEventHandlers(): void {
+    this.eventBus.subscribe(EVENTS.RAW_MATERIAL_LOW, async (raw) => {
+      const payload = raw as { ingredientName: string };
+      console.log(`[Order] RAW_MATERIAL_LOW → hiding combos with "${payload.ingredientName}"`);
+      await this.menuRepo.setUnavailableByIngredient(payload.ingredientName);
+    });
+  }
+}
+
+// ─── Controller / Router ──────────────────────────────────
+export function registerOrderModule(db: Pool, eventBus: SimpleEventBus): Router {
+  const router     = Router();
+  const menuRepo   = new MenuRepository(db);
+  const orderRepo  = new OrderRepository(db);
+  const service    = new OrderService(menuRepo, orderRepo, eventBus);
+
+  // Đăng ký event listener ngay khi module được load
+  service.registerEventHandlers();
+
+  // GET /menu — ai cũng được xem
+  router.get('/menu', authenticate, async (_req: Request, res: Response) => {
+    try {
+      res.json(await service.getMenu());
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // PATCH /menu/:id/availability — admin/manager
+  router.patch('/menu/:id/availability',
+    authenticate, authorize('admin', 'manager'),
+    async (req: Request, res: Response) => {
+      try {
+        await service.setMenuAvailability(req.params.id, req.body.isAvailable);
+        res.json({ ok: true });
+      } catch (e: any) {
+        res.status(400).json({ error: e.message });
+      }
+    }
+  );
+
+  // POST /orders — server, manager, admin
+  router.post('/orders',
+    authenticate, authorize('server', 'manager', 'admin'),
+    async (req: Request, res: Response) => {
+      try {
+        const order = await service.createOrder(req.body as CreateOrderDto);
+        res.status(201).json(order);
+      } catch (e: any) {
+        res.status(400).json({ error: e.message });
+      }
+    }
+  );
+
+  // GET /orders/table/:tableId — server, casher, manager, admin
+  router.get('/orders/table/:tableId',
+    authenticate, authorize('server', 'casher', 'manager', 'admin'),
+    async (req: Request, res: Response) => {
+      try {
+        res.json(await service.getOrdersByTable(req.params.tableId));
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  );
+
+  return router;
+}
+// src/modules/table/index.ts
+// Module Table & Reservation — theo dõi trạng thái bàn
+
+import { Router, Request, Response } from 'express';
+import { Pool } from 'pg';
+import { SimpleEventBus } from '../../infrastructure/eventBus';
+import { authenticate, authorize } from '../../infrastructure/auth';
+import {
+  EVENTS,
+  OrderCreatedPayload,
+  OrderCompletedPayload,
+  PaymentCompletedPayload,
+} from '../../shared/events';
+
+// ─── Models ───────────────────────────────────────────────
+type TableStatus = 'available' | 'occupied' | 'food_ready';
+
+interface Table {
+  id: string;
+  tableNumber: string;
+  status: TableStatus;
+}
+
+// ─── Repository ───────────────────────────────────────────
+class TableRepository {
+  constructor(private db: Pool) {}
+
+  async findAll(): Promise<Table[]> {
+    const { rows } = await this.db.query(
+      `SELECT id, table_number AS "tableNumber", status FROM tables ORDER BY table_number`
+    );
+    return rows;
+  }
+
+  async findByNumber(tableNumber: string): Promise<Table | null> {
+    const { rows } = await this.db.query(
+      `SELECT id, table_number AS "tableNumber", status
+       FROM tables WHERE table_number = $1`,
+      [tableNumber]
+    );
+    return rows[0] ?? null;
+  }
+
+  async updateStatusByNumber(tableNumber: string, status: TableStatus): Promise<void> {
+    // Nếu bàn chưa tồn tại trong DB, tạo mới (upsert)
+    await this.db.query(
+      `INSERT INTO tables (table_number, status) VALUES ($1, $2)
+       ON CONFLICT (table_number) DO UPDATE SET status = $2`,
+      [tableNumber, status]
+    );
+  }
+}
+
+// ─── Service ──────────────────────────────────────────────
+class TableService {
+  constructor(
+    private repo: TableRepository,
+    private eventBus: SimpleEventBus
+  ) {}
+
+  async getAllTables(): Promise<Table[]> {
+    return this.repo.findAll();
+  }
+
+  registerEventHandlers(): void {
+    // ORDER_CREATED → bàn chuyển sang "occupied"
+    this.eventBus.subscribe(EVENTS.ORDER_CREATED, async (raw) => {
+      const payload = raw as OrderCreatedPayload;
+      console.log(`[Table] ORDER_CREATED → table ${payload.tableId} → occupied`);
+      await this.repo.updateStatusByNumber(payload.tableId, 'occupied');
+    });
+
+    // ORDER_COMPLETED → bàn chuyển sang "food_ready"
+    this.eventBus.subscribe(EVENTS.ORDER_COMPLETED, async (raw) => {
+      const payload = raw as OrderCompletedPayload;
+      console.log(`[Table] ORDER_COMPLETED → table ${payload.tableId} → food_ready`);
+      await this.repo.updateStatusByNumber(payload.tableId, 'food_ready');
+    });
+
+    // PAYMENT_COMPLETED → bàn trở về "available"
+    this.eventBus.subscribe(EVENTS.PAYMENT_COMPLETED, async (raw) => {
+      const payload = raw as PaymentCompletedPayload;
+      console.log(`[Table] PAYMENT_COMPLETED → table ${payload.tableId} → available`);
+      await this.repo.updateStatusByNumber(payload.tableId, 'available');
+    });
+  }
+}
+
+// ─── Controller / Router ──────────────────────────────────
+export function registerTableModule(db: Pool, eventBus: SimpleEventBus): Router {
+  const router  = Router();
+  const repo    = new TableRepository(db);
+  const service = new TableService(repo, eventBus);
+
+  service.registerEventHandlers();
+
+  // GET /tables — server, manager, admin
+  router.get('/tables',
+    authenticate, authorize('server', 'manager', 'admin', 'casher'),
+    async (_req: Request, res: Response) => {
+      try {
+        res.json(await service.getAllTables());
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  );
+
+  return router;
+}
+// src/shared/events.ts
+// Tất cả tên event dùng chung — không dùng string magic
+
+export const EVENTS = {
+  ORDER_CREATED:       'ORDER_CREATED',
+  ORDER_COMPLETED:     'ORDER_COMPLETED',
+  PAYMENT_COMPLETED:   'PAYMENT_COMPLETED',
+  RAW_MATERIAL_LOW:    'RAW_MATERIAL_LOW',
+} as const;
+
+// Payload types cho mỗi event
+export interface OrderCreatedPayload {
+  orderId:   string;
+  tableId:   string;
+  comboId:   string;
+  comboName: string;
+  quantity:  number;
+  notes:     string;
+  totalPrice: number;
+}
+
+export interface OrderCompletedPayload {
+  orderId:  string;
+  tableId:  string;
+}
+
+export interface PaymentCompletedPayload {
+  billId:   string;
+  tableId:  string;
+  amount:   number;
+  date:     string;
+}
+
+export interface RawMaterialLowPayload {
+  ingredientName: string;
+  currentQty:     number;
+  threshold:      number;
+}
+// be/src/app.ts
+// Composition root — nối tất cả module lại
+
+import express from 'express';
+import cors from 'cors';
+import { pool } from './infrastructure/db';
+import { SimpleEventBus } from './infrastructure/eventBus';
+
+// Modules
+import { registerOrderModule }     from './modules/order';
+import { registerKitchenModule }   from './modules/kitchen';
+import { registerTableModule }     from './modules/table';
+import { registerBillingModule }   from './modules/billing';
+import { registerInventoryModule } from './modules/inventory';
+import { registerAnalyticsModule } from './modules/analytics';
+
+async function bootstrap() {
+  const app      = express();
+  const eventBus = new SimpleEventBus();
+  const PORT     = parseInt(process.env.PORT || '3000');
+
+  // ── Middleware ──────────────────────────────────────────
+  app.use(cors({
+    origin: [
+      'http://localhost:5173',  // Vite dev
+      'http://localhost:4173',  // Vite preview
+      'http://localhost:3001',  // alternate
+    ],
+    credentials: true,
+  }));
+  app.use(express.json());
+
+  // Request logger (dev)
+  app.use((req, _res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    next();
+  });
+
+  // ── QUAN TRỌNG: Thứ tự đăng ký module ──────────────────
+  // Subscriber phải đăng ký TRƯỚC publisher để không bỏ lỡ event
+  //
+  //  ORDER_CREATED  → Kitchen, Table, Inventory cần lắng nghe
+  //  ORDER_COMPLETED→ Billing, Table cần lắng nghe
+  //  PAYMENT_COMPLETED → Table, Analytics cần lắng nghe
+  //  RAW_MATERIAL_LOW  → Order (menu) cần lắng nghe
+  //
+  // Thứ tự: Kitchen → Table → Billing → Inventory → Analytics → Order
+
+  app.use('/api', registerKitchenModule(pool, eventBus));   // lắng nghe ORDER_CREATED
+  app.use('/api', registerTableModule(pool, eventBus));     // lắng nghe ORDER_CREATED, ORDER_COMPLETED, PAYMENT_COMPLETED
+  app.use('/api', registerBillingModule(pool, eventBus));   // lắng nghe ORDER_COMPLETED; phát PAYMENT_COMPLETED
+  app.use('/api', registerInventoryModule(pool, eventBus)); // lắng nghe ORDER_CREATED; phát RAW_MATERIAL_LOW
+  app.use('/api', registerAnalyticsModule(pool, eventBus)); // lắng nghe PAYMENT_COMPLETED; xử lý auth
+  app.use('/api', registerOrderModule(pool, eventBus));     // phát ORDER_CREATED; lắng nghe RAW_MATERIAL_LOW
+
+  // ── Health check ────────────────────────────────────────
+  app.get('/health', async (_req, res) => {
+    try {
+      await pool.query('SELECT 1');
+      res.json({ status: 'ok', db: 'connected', ts: new Date().toISOString() });
+    } catch {
+      res.status(503).json({ status: 'error', db: 'disconnected' });
+    }
+  });
+
+  // ── 404 handler ─────────────────────────────────────────
+  app.use((_req, res) => {
+    res.status(404).json({ error: 'Route not found' });
+  });
+
+  // ── Global error handler ────────────────────────────────
+  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error('[App] Unhandled error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  });
+
+  // ── Start ───────────────────────────────────────────────
+  app.listen(PORT, () => {
+    console.log(`\n🍽️  IRMS Backend running on http://localhost:${PORT}`);
+    console.log(`📋  API base: http://localhost:${PORT}/api`);
+    console.log(`❤️  Health:   http://localhost:${PORT}/health\n`);
+  });
+
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    console.log('[App] SIGTERM received, closing pool...');
+    await pool.end();
+    process.exit(0);
+  });
+}
+
+bootstrap().catch(err => {
+  console.error('[App] Failed to start:', err);
+  process.exit(1);
+});
+
 

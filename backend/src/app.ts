@@ -1,4 +1,4 @@
-// src/app.ts
+// be/src/app.ts
 // Composition root — nối tất cả module lại
 
 import express from 'express';
