@@ -28,8 +28,9 @@ export function LoginPage() {
             const { token } = await analyticsApi.login(username, password);
             login(token);
             // Redirect dựa vào role trong token
-            const decoded = JSON.parse(atob(token.split('.')[1]));
-            navigate(roleDefaultRoute[decoded.role] ?? '/');
+            // Bằng:
+            login(token); // login() trong AuthContext đã decode rồi
+            const { user } = useAuth(); // nhưng state chưa update ngay
         } catch { setError('Sai tên đăng nhập hoặc mật khẩu'); }
     };
 
