@@ -44,6 +44,8 @@
 //  |   ├── .env
 //  |   ├── package-lock.json
 //  |   |-- index.html
+//  |   |-- tsconfig.json
+//  |   |-- tsconfig.node.json
 //  | 
 //  │
 //  └── backend/           (Express + TypeScript)
@@ -56,6 +58,7 @@
 //      └── tsconfig.json
 //      └── .env
 //      └── package-lock.json
+//     
 
 // ============================================================
 
@@ -1192,6 +1195,39 @@ VITE_API_URL=http://localhost:3000/api
   </body>
 </html>
 
+// location: frontend/tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}
+// location: frontend/tsconfig.node.json
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["vite.config.ts"]
+}
 
 // location: frontend/package-lock.json, đây là file cũ tôi chưa cập nhập, bạn có thể tham khảo
 {
