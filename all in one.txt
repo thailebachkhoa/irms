@@ -43,6 +43,7 @@
 //  │   └── vite.config.ts
 //  |   ├── .env
 //  |   ├── package-lock.json
+//  |   |-- index.html
 //  | 
 //  │
 //  └── backend/           (Express + TypeScript)
@@ -1171,6 +1172,27 @@ interface ImportMeta {
 }
 // location: frontend/.env
 VITE_API_URL=http://localhost:3000/api
+
+// location: frontend/index.html
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IRMS — Hệ thống Quản lý Nhà hàng</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
+
 // location: frontend/package-lock.json, đây là file cũ tôi chưa cập nhập, bạn có thể tham khảo
 {
   "name": "irms-frontend",
@@ -5329,6 +5351,35 @@ PORT=3000
         "node": ">=6"
       }
     }
+  }
+}
+// be/package.json
+{
+  "name": "irms-backend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js",
+    "db:init": "ts-node src/infrastructure/initDb.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.0",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.10.0",
+    "@types/pg": "^8.10.9",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.0"
   }
 }
 
