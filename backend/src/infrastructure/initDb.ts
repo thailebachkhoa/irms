@@ -27,17 +27,17 @@ async function initDb() {
       CREATE TABLE IF NOT EXISTS menu_items (
         id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name         VARCHAR(100) NOT NULL,
-        price        INTEGER NOT NULL,   -- đơn vị: VND
+        price        INTEGER NOT NULL,
         is_available BOOLEAN DEFAULT TRUE,
         created_at   TIMESTAMPTZ DEFAULT NOW()
       );
 
       -- Dishes (món ăn trong combo)
       CREATE TABLE IF NOT EXISTS dishes (
-        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name          VARCHAR(100) NOT NULL,
-        category      VARCHAR(50),  -- ngọt/mặn/...
-        cooking_method VARCHAR(50)  -- nướng/xào/chiên/...
+        id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name           VARCHAR(100) NOT NULL,
+        category       VARCHAR(50),
+        cooking_method VARCHAR(50)
       );
 
       -- Combo → Dish mapping
@@ -56,7 +56,7 @@ async function initDb() {
         threshold NUMERIC(10,2) NOT NULL DEFAULT 0
       );
 
-      -- Dish → Ingredient mapping (số lượng cần để nấu 1 đơn vị dish)
+      -- Dish → Ingredient mapping
       CREATE TABLE IF NOT EXISTS dish_ingredients (
         dish_id         UUID REFERENCES dishes(id) ON DELETE CASCADE,
         ingredient_name VARCHAR(100) NOT NULL,
@@ -123,12 +123,12 @@ async function initDb() {
 
     console.log('[InitDB] Tables created. Seeding data...');
 
-    // Seed admin user
-    const adminHash = await bcrypt.hash('admin123', 10);
+    // ── Seed users ────────────────────────────────────────
+    const adminHash   = await bcrypt.hash('admin123',   10);
     const managerHash = await bcrypt.hash('manager123', 10);
-    const serverHash = await bcrypt.hash('server123', 10);
-    const chefHash = await bcrypt.hash('chef123', 10);
-    const casherHash = await bcrypt.hash('casher123', 10);
+    const serverHash  = await bcrypt.hash('server123',  10);
+    const chefHash    = await bcrypt.hash('chef123',    10);
+    const casherHash  = await bcrypt.hash('casher123',  10);
 
     await client.query(`
       INSERT INTO users (username, password, role) VALUES
@@ -140,19 +140,19 @@ async function initDb() {
       ON CONFLICT (username) DO NOTHING;
     `, [adminHash, managerHash, serverHash, chefHash, casherHash]);
 
-    // Seed menu items
+    // ── Seed menu items ───────────────────────────────────
     await client.query(`
       INSERT INTO menu_items (id, name, price, is_available) VALUES
-        ('a1b2c3d4-0000-0000-0000-000000000001', 'Combo Gà Hàn Quốc',     130000, true),
-        ('a1b2c3d4-0000-0000-0000-000000000002', 'Combo Gogi Bò Nướng',   180000, true),
-        ('a1b2c3d4-0000-0000-0000-000000000003', 'Combo Phở Đặc Biệt',    95000,  true),
-        ('a1b2c3d4-0000-0000-0000-000000000004', 'Combo Trẻ Em Khuyến Mãi',65000,  true),
-        ('a1b2c3d4-0000-0000-0000-000000000005', 'Combo Hải Sản Cao Cấp', 250000, true),
-        ('a1b2c3d4-0000-0000-0000-000000000006', 'Combo Chay Thanh Đạm',  80000,  true)
+        ('a1b2c3d4-0000-0000-0000-000000000001', 'Combo Gà Hàn Quốc',      130000, true),
+        ('a1b2c3d4-0000-0000-0000-000000000002', 'Combo Gogi Bò Nướng',    180000, true),
+        ('a1b2c3d4-0000-0000-0000-000000000003', 'Combo Phở Đặc Biệt',      95000, true),
+        ('a1b2c3d4-0000-0000-0000-000000000004', 'Combo Trẻ Em Khuyến Mãi', 65000, true),
+        ('a1b2c3d4-0000-0000-0000-000000000005', 'Combo Hải Sản Cao Cấp',  250000, true),
+        ('a1b2c3d4-0000-0000-0000-000000000006', 'Combo Chay Thanh Đạm',    80000, true)
       ON CONFLICT (id) DO NOTHING;
     `);
 
-    // Seed tables (10 bàn)
+    // ── Seed tables ───────────────────────────────────────
     await client.query(`
       INSERT INTO tables (table_number, status) VALUES
         ('001', 'available'), ('002', 'available'), ('003', 'available'),
@@ -162,51 +162,115 @@ async function initDb() {
       ON CONFLICT (table_number) DO NOTHING;
     `);
 
-    // Seed ingredients
+    // ── Seed ingredients ──────────────────────────────────
     await client.query(`
       INSERT INTO ingredients (name, quantity, unit, threshold) VALUES
-        ('Gà',          50,    'kg',  10),
-        ('Bò',          30,    'kg',  8),
-        ('Rau muống',   100,   'bó',  20),
-        ('Dầu ăn',      20000, 'ml',  3000),
-        ('Tỏi',         5000,  'g',   500),
-        ('Hành',        3000,  'g',   400),
-        ('Bún/Phở',     80,    'kg',  15),
-        ('Xương hầm',   25,    'kg',  5),
-        ('Tôm',         20,    'kg',  5),
-        ('Mực',         15,    'kg',  4),
-        ('Rau cải',     60,    'bó',  10),
-        ('Đậu hũ',      40,    'kg',  8),
-        ('Nước mắm',    10000, 'ml',  1000),
-        ('Muối',        5000,  'g',   500),
-        ('Đường',       3000,  'g',   300)
+        ('Gà',        50,    'kg',  10),
+        ('Bò',        30,    'kg',   8),
+        ('Rau muống', 100,   'bó',  20),
+        ('Dầu ăn',    20000, 'ml', 3000),
+        ('Tỏi',       5000,  'g',  500),
+        ('Hành',      3000,  'g',  400),
+        ('Bún/Phở',   80,    'kg',  15),
+        ('Xương hầm', 25,    'kg',   5),
+        ('Tôm',       20,    'kg',   5),
+        ('Mực',       15,    'kg',   4),
+        ('Rau cải',   60,    'bó',  10),
+        ('Đậu hũ',    40,    'kg',   8),
+        ('Nước mắm',  10000, 'ml', 1000),
+        ('Muối',      5000,  'g',  500),
+        ('Đường',     3000,  'g',  300)
       ON CONFLICT (name) DO NOTHING;
     `);
-    // Seed dishes
-    await client.query(`
-  INSERT INTO dishes (id, name, category, cooking_method) VALUES
-    ('d0000001-...', 'Gà chiên Hàn Quốc', 'mặn', 'chiên'),
-    ('d0000002-...', 'Cơm trắng', 'mặn', 'hấp'),
-    ...
-  ON CONFLICT (id) DO NOTHING;
-`);
 
-    // Seed combo_dishes (combo ↔ dish)
+    // ── Seed dishes ───────────────────────────────────────
     await client.query(`
-  INSERT INTO combo_dishes (combo_id, dish_id) VALUES
-    ('a1b2c3d4-...-000000000001', 'd0000001-...'), -- Combo Gà → Gà chiên
-    ...
-  ON CONFLICT DO NOTHING;
-`);
+      INSERT INTO dishes (id, name, category, cooking_method) VALUES
+        ('d0000001-0000-0000-0000-000000000001', 'Gà chiên Hàn Quốc',   'mặn',  'chiên'),
+        ('d0000001-0000-0000-0000-000000000002', 'Rau muống xào tỏi',   'mặn',  'xào'),
+        ('d0000001-0000-0000-0000-000000000003', 'Cơm trắng',           'mặn',  'hấp'),
+        ('d0000002-0000-0000-0000-000000000001', 'Bò nướng Gogi',       'mặn',  'nướng'),
+        ('d0000002-0000-0000-0000-000000000002', 'Rau cải xào',         'mặn',  'xào'),
+        ('d0000003-0000-0000-0000-000000000001', 'Phở bò đặc biệt',     'mặn',  'luộc'),
+        ('d0000004-0000-0000-0000-000000000001', 'Cơm gà trẻ em',       'mặn',  'chiên'),
+        ('d0000005-0000-0000-0000-000000000001', 'Tôm hấp bia',         'mặn',  'hấp'),
+        ('d0000005-0000-0000-0000-000000000002', 'Mực xào sa tế',       'mặn',  'xào'),
+        ('d0000006-0000-0000-0000-000000000001', 'Đậu hũ sốt cà',       'chay', 'xào'),
+        ('d0000006-0000-0000-0000-000000000002', 'Rau cải luộc',        'chay', 'luộc')
+      ON CONFLICT (id) DO NOTHING;
+    `);
 
-    // Seed dish_ingredients (dish ↔ ingredient)
+    // ── Seed combo_dishes ─────────────────────────────────
     await client.query(`
-  INSERT INTO dish_ingredients (dish_id, ingredient_name, qty_needed, unit) VALUES
-    ('d0000001-...', 'Gà', 0.3, 'kg'),
-    ('d0000001-...', 'Dầu ăn', 200, 'ml'),
-    ...
-  ON CONFLICT DO NOTHING;
-`);
+      INSERT INTO combo_dishes (combo_id, dish_id) VALUES
+        -- Combo Gà Hàn Quốc
+        ('a1b2c3d4-0000-0000-0000-000000000001', 'd0000001-0000-0000-0000-000000000001'),
+        ('a1b2c3d4-0000-0000-0000-000000000001', 'd0000001-0000-0000-0000-000000000002'),
+        ('a1b2c3d4-0000-0000-0000-000000000001', 'd0000001-0000-0000-0000-000000000003'),
+        -- Combo Gogi Bò Nướng
+        ('a1b2c3d4-0000-0000-0000-000000000002', 'd0000002-0000-0000-0000-000000000001'),
+        ('a1b2c3d4-0000-0000-0000-000000000002', 'd0000002-0000-0000-0000-000000000002'),
+        ('a1b2c3d4-0000-0000-0000-000000000002', 'd0000001-0000-0000-0000-000000000003'),
+        -- Combo Phở Đặc Biệt
+        ('a1b2c3d4-0000-0000-0000-000000000003', 'd0000003-0000-0000-0000-000000000001'),
+        -- Combo Trẻ Em
+        ('a1b2c3d4-0000-0000-0000-000000000004', 'd0000004-0000-0000-0000-000000000001'),
+        ('a1b2c3d4-0000-0000-0000-000000000004', 'd0000001-0000-0000-0000-000000000003'),
+        -- Combo Hải Sản
+        ('a1b2c3d4-0000-0000-0000-000000000005', 'd0000005-0000-0000-0000-000000000001'),
+        ('a1b2c3d4-0000-0000-0000-000000000005', 'd0000005-0000-0000-0000-000000000002'),
+        ('a1b2c3d4-0000-0000-0000-000000000005', 'd0000001-0000-0000-0000-000000000003'),
+        -- Combo Chay
+        ('a1b2c3d4-0000-0000-0000-000000000006', 'd0000006-0000-0000-0000-000000000001'),
+        ('a1b2c3d4-0000-0000-0000-000000000006', 'd0000006-0000-0000-0000-000000000002'),
+        ('a1b2c3d4-0000-0000-0000-000000000006', 'd0000001-0000-0000-0000-000000000003')
+      ON CONFLICT DO NOTHING;
+    `);
+
+    // ── Seed dish_ingredients ─────────────────────────────
+    await client.query(`
+      INSERT INTO dish_ingredients (dish_id, ingredient_name, qty_needed, unit) VALUES
+        -- Gà chiên Hàn Quốc
+        ('d0000001-0000-0000-0000-000000000001', 'Gà',      0.3,  'kg'),
+        ('d0000001-0000-0000-0000-000000000001', 'Dầu ăn',  200,  'ml'),
+        ('d0000001-0000-0000-0000-000000000001', 'Tỏi',     20,   'g'),
+        -- Rau muống xào tỏi
+        ('d0000001-0000-0000-0000-000000000002', 'Rau muống', 1,  'bó'),
+        ('d0000001-0000-0000-0000-000000000002', 'Tỏi',       15, 'g'),
+        ('d0000001-0000-0000-0000-000000000002', 'Dầu ăn',    50, 'ml'),
+        -- Cơm trắng
+        ('d0000001-0000-0000-0000-000000000003', 'Muối',  5, 'g'),
+        -- Bò nướng Gogi
+        ('d0000002-0000-0000-0000-000000000001', 'Bò',      0.35, 'kg'),
+        ('d0000002-0000-0000-0000-000000000001', 'Hành',    30,   'g'),
+        ('d0000002-0000-0000-0000-000000000001', 'Nước mắm',30,   'ml'),
+        -- Rau cải xào
+        ('d0000002-0000-0000-0000-000000000002', 'Rau cải', 1,    'bó'),
+        ('d0000002-0000-0000-0000-000000000002', 'Dầu ăn',  50,   'ml'),
+        -- Phở bò
+        ('d0000003-0000-0000-0000-000000000001', 'Bò',       0.2, 'kg'),
+        ('d0000003-0000-0000-0000-000000000001', 'Bún/Phở',  0.1, 'kg'),
+        ('d0000003-0000-0000-0000-000000000001', 'Xương hầm',0.3, 'kg'),
+        ('d0000003-0000-0000-0000-000000000001', 'Hành',     20,  'g'),
+        -- Cơm gà trẻ em
+        ('d0000004-0000-0000-0000-000000000001', 'Gà',      0.15, 'kg'),
+        ('d0000004-0000-0000-0000-000000000001', 'Dầu ăn',  100,  'ml'),
+        -- Tôm hấp bia
+        ('d0000005-0000-0000-0000-000000000001', 'Tôm',     0.3, 'kg'),
+        ('d0000005-0000-0000-0000-000000000001', 'Hành',    10,  'g'),
+        -- Mực xào sa tế
+        ('d0000005-0000-0000-0000-000000000002', 'Mực',     0.25, 'kg'),
+        ('d0000005-0000-0000-0000-000000000002', 'Dầu ăn',  80,   'ml'),
+        ('d0000005-0000-0000-0000-000000000002', 'Tỏi',     15,   'g'),
+        -- Đậu hũ sốt cà
+        ('d0000006-0000-0000-0000-000000000001', 'Đậu hũ',  0.2, 'kg'),
+        ('d0000006-0000-0000-0000-000000000001', 'Dầu ăn',  60,  'ml'),
+        -- Rau cải luộc
+        ('d0000006-0000-0000-0000-000000000002', 'Rau cải', 1,   'bó'),
+        ('d0000006-0000-0000-0000-000000000002', 'Muối',    5,   'g')
+      ON CONFLICT DO NOTHING;
+    `);
+
     console.log('[InitDB] ✅ Done! Default accounts:');
     console.log('  admin   / admin123');
     console.log('  manager / manager123');

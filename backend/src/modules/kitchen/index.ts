@@ -58,15 +58,12 @@ class KitchenRepository {
     return rows[0] ?? null;
   }
 
-  async findById(id: string): Promise<KitchenTicket | null> {
-    const { rows } = await this.db.query(
-      `SELECT id, order_id AS "orderId", table_id AS "tableId",
-              combo_name AS "comboName", quantity, notes, status,
-              created_at AS "createdAt"
-       FROM kitchen_tickets WHERE id = $1`,
-      [id]
+  // FIX: đồng bộ status lên bảng orders
+  async updateOrderStatus(orderId: string, status: 'cooking' | 'done'): Promise<void> {
+    await this.db.query(
+      `UPDATE orders SET status = $1 WHERE id = $2`,
+      [status, orderId]
     );
-    return rows[0] ?? null;
   }
 }
 
@@ -84,6 +81,10 @@ class KitchenService {
   async startCooking(id: string): Promise<KitchenTicket> {
     const ticket = await this.repo.updateStatus(id, 'cooking');
     if (!ticket) throw new Error(`Ticket ${id} not found`);
+
+    // Đồng bộ trạng thái nấu lên orders
+    await this.repo.updateOrderStatus(ticket.orderId, 'cooking');
+
     return ticket;
   }
 
@@ -91,7 +92,7 @@ class KitchenService {
     const ticket = await this.repo.updateStatus(id, 'done');
     if (!ticket) throw new Error(`Ticket ${id} not found`);
 
-    // Phát event ORDER_COMPLETED cho Table + Billing
+    // Phát event ORDER_COMPLETED cho Table + Billing + Order
     const payload: OrderCompletedPayload = {
       orderId: ticket.orderId,
       tableId: ticket.tableId,
@@ -102,7 +103,6 @@ class KitchenService {
   }
 
   registerEventHandlers(): void {
-    // Lắng nghe ORDER_CREATED → tạo ticket
     this.eventBus.subscribe(EVENTS.ORDER_CREATED, async (raw) => {
       const payload = raw as OrderCreatedPayload;
       console.log(`[Kitchen] ORDER_CREATED → creating ticket for order ${payload.orderId}`);

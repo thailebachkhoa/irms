@@ -1,5 +1,5 @@
 // src/modules/order/index.ts
-// Module Order & Menu — đầy đủ models, repo, service, controller, router
+// Module Order & Menu
 
 import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
@@ -60,9 +60,8 @@ class MenuRepository {
     );
   }
 
-  // Đặt unavailable khi nguyên liệu thiếu
+  // Đặt unavailable khi nguyên liệu thiếu (qua combo_dishes → dish_ingredients)
   async setUnavailableByIngredient(ingredientName: string): Promise<void> {
-    // Tìm tất cả combo dùng nguyên liệu này (qua dish_ingredients → combo_dishes)
     await this.db.query(`
       UPDATE menu_items SET is_available = false
       WHERE id IN (
@@ -125,14 +124,17 @@ class OrderService {
   }
 
   async createOrder(dto: CreateOrderDto): Promise<Order> {
+    if (!dto.tableId || !dto.comboId || !dto.quantity || dto.quantity < 1) {
+      throw new Error('tableId, comboId, quantity (>=1) are required');
+    }
+
     const combo = await this.menuRepo.findById(dto.comboId);
     if (!combo) throw new Error(`Combo ${dto.comboId} not found`);
     if (!combo.isAvailable) throw new Error(`Combo "${combo.name}" is not available`);
 
     const totalPrice = combo.price * dto.quantity;
-    const order = await this.orderRepo.save(dto, combo.name, totalPrice);
+    const order      = await this.orderRepo.save(dto, combo.name, totalPrice);
 
-    // Phát event cho Kitchen, Table, Inventory
     const payload: OrderCreatedPayload = {
       orderId:    order.id,
       tableId:    order.tableId,
@@ -151,27 +153,32 @@ class OrderService {
     return this.orderRepo.findByTable(tableId);
   }
 
-  // Handler: nhận RAW_MATERIAL_LOW từ Inventory
+  // FIX: cập nhập status order → done khi kitchen xong
   registerEventHandlers(): void {
     this.eventBus.subscribe(EVENTS.RAW_MATERIAL_LOW, async (raw) => {
       const payload = raw as { ingredientName: string };
       console.log(`[Order] RAW_MATERIAL_LOW → hiding combos with "${payload.ingredientName}"`);
       await this.menuRepo.setUnavailableByIngredient(payload.ingredientName);
     });
+
+    this.eventBus.subscribe(EVENTS.ORDER_COMPLETED, async (raw) => {
+      const payload = raw as { orderId: string };
+      console.log(`[Order] ORDER_COMPLETED → updating order ${payload.orderId} → done`);
+      await this.orderRepo.updateStatus(payload.orderId, 'done');
+    });
   }
 }
 
 // ─── Controller / Router ──────────────────────────────────
 export function registerOrderModule(db: Pool, eventBus: SimpleEventBus): Router {
-  const router     = Router();
-  const menuRepo   = new MenuRepository(db);
-  const orderRepo  = new OrderRepository(db);
-  const service    = new OrderService(menuRepo, orderRepo, eventBus);
+  const router    = Router();
+  const menuRepo  = new MenuRepository(db);
+  const orderRepo = new OrderRepository(db);
+  const service   = new OrderService(menuRepo, orderRepo, eventBus);
 
-  // Đăng ký event listener ngay khi module được load
   service.registerEventHandlers();
 
-  // GET /menu — ai cũng được xem
+  // GET /menu — tất cả đã đăng nhập
   router.get('/menu', authenticate, async (_req: Request, res: Response) => {
     try {
       res.json(await service.getMenu());
@@ -180,7 +187,7 @@ export function registerOrderModule(db: Pool, eventBus: SimpleEventBus): Router 
     }
   });
 
-  // PATCH /menu/:id/availability — admin/manager
+  // PATCH /menu/:id/availability — admin, manager
   router.patch('/menu/:id/availability',
     authenticate, authorize('admin', 'manager'),
     async (req: Request, res: Response) => {

@@ -26,7 +26,7 @@ class BillingRepository {
   constructor(private db: Pool) {}
 
   async createBill(orderId: string, tableId: string, totalAmount: number): Promise<Bill> {
-    // Nếu bill cho order này đã tồn tại (idempotent), trả về cái cũ
+    // Idempotent: nếu bill cho order này đã tồn tại, trả về cái cũ
     const existing = await this.db.query(
       `SELECT id, order_id AS "orderId", table_id AS "tableId",
               total_amount AS "totalAmount", status, created_at AS "createdAt"
@@ -47,29 +47,19 @@ class BillingRepository {
 
   async findPendingByTable(tableId: string): Promise<Bill | null> {
     const { rows } = await this.db.query(
-      `SELECT b.id, b.order_id AS "orderId", b.table_id AS "tableId",
-              b.total_amount AS "totalAmount", b.status, b.created_at AS "createdAt"
-       FROM bills b
-       WHERE b.table_id = $1 AND b.status = 'pending'
-       ORDER BY b.created_at DESC LIMIT 1`,
-      [tableId]
-    );
-    return rows[0] ?? null;
-  }
-
-  async findById(id: string): Promise<Bill | null> {
-    const { rows } = await this.db.query(
       `SELECT id, order_id AS "orderId", table_id AS "tableId",
               total_amount AS "totalAmount", status, created_at AS "createdAt"
-       FROM bills WHERE id = $1`,
-      [id]
+       FROM bills
+       WHERE table_id = $1 AND status = 'pending'
+       ORDER BY created_at DESC LIMIT 1`,
+      [tableId]
     );
     return rows[0] ?? null;
   }
 
   async markPaid(id: string): Promise<Bill | null> {
     const { rows } = await this.db.query(
-      `UPDATE bills SET status = 'paid' WHERE id = $1
+      `UPDATE bills SET status = 'paid' WHERE id = $1 AND status = 'pending'
        RETURNING id, order_id AS "orderId", table_id AS "tableId",
                  total_amount AS "totalAmount", status, created_at AS "createdAt"`,
       [id]
@@ -77,8 +67,8 @@ class BillingRepository {
     return rows[0] ?? null;
   }
 
-  // Lấy total_price từ order để tạo bill khi nhận event
-  async getOrderTotalPrice(orderId: string): Promise<{ totalPrice: number; tableId: string } | null> {
+  // FIX: dùng đúng column name (table_id là VARCHAR, total_price từ orders)
+  async getOrderInfo(orderId: string): Promise<{ totalPrice: number; tableId: string } | null> {
     const { rows } = await this.db.query(
       `SELECT total_price AS "totalPrice", table_id AS "tableId"
        FROM orders WHERE id = $1`,
@@ -120,7 +110,7 @@ class BillingService {
       const payload = raw as OrderCompletedPayload;
       console.log(`[Billing] ORDER_COMPLETED → creating bill for order ${payload.orderId}`);
 
-      const orderInfo = await this.repo.getOrderTotalPrice(payload.orderId);
+      const orderInfo = await this.repo.getOrderInfo(payload.orderId);
       if (!orderInfo) {
         console.error(`[Billing] Order ${payload.orderId} not found`);
         return;
