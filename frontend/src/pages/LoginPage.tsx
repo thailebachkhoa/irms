@@ -1,7 +1,3 @@
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/pages/LoginPage.tsx
-// ────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { analyticsApi } from '../services/analyticsApi';
@@ -9,32 +5,31 @@ import { useAuth } from '../context/AuthContext';
 import { jwtDecode } from 'jwt-decode';
 import type { AuthPayload } from '../types';
 
+const ROLE_ROUTES: Record<string, string> = {
+    server: '/server',
+    chef: '/kitchen',
+    casher: '/casher',
+    manager: '/manager',
+    admin: '/admin',
+};
+
 export function LoginPage() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-    const { login, user } = useAuth();
+    const { login } = useAuth();
     const navigate = useNavigate();
-
-    // Role → trang mặc định sau khi đăng nhập
-    const roleDefaultRoute: Record<string, string> = {
-        server: '/server',
-        chef: '/kitchen',
-        casher: '/casher',
-        manager: '/manager',
-        admin: '/admin',
-    };
 
     const submit = async () => {
         try {
             const { token } = await analyticsApi.login(username, password);
-            const decoded = jwtDecode<AuthPayload>(token); // decode trước
-            login(token);                                   // gọi 1 lần
-            navigate(roleDefaultRoute[decoded.role] ?? '/login'); // navigate
+            const decoded = jwtDecode<AuthPayload>(token);
+            login(token);
+            navigate(ROLE_ROUTES[decoded.role] ?? '/login');
         } catch {
             setError('Sai tên đăng nhập hoặc mật khẩu');
         }
-    }
+    };
 
     return (
         <div style={{

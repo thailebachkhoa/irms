@@ -1,9 +1,3 @@
-
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/components/MenuGrid.tsx
-// Hiển thị toàn bộ menu, highlight combo hết hàng
-// ────────────────────────────────────────────────────────────
 import type { MenuItem } from '../types';
 
 type Props = {

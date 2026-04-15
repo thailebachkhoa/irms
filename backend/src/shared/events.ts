@@ -1,6 +1,3 @@
-// src/shared/events.ts
-// Tất cả tên event dùng chung — không dùng string magic
-
 export const EVENTS = {
   ORDER_CREATED:       'ORDER_CREATED',
   ORDER_COMPLETED:     'ORDER_COMPLETED',
@@ -8,7 +5,6 @@ export const EVENTS = {
   RAW_MATERIAL_LOW:    'RAW_MATERIAL_LOW',
 } as const;
 
-// Payload types cho mỗi event
 export interface OrderCreatedPayload {
   orderId:   string;
   tableId:   string;

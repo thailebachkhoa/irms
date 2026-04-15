@@ -1,6 +1,3 @@
-// src/modules/billing/index.ts
-// Module Billing & Payment
-
 import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
 import { SimpleEventBus } from '../../infrastructure/eventBus';
@@ -11,7 +8,6 @@ import {
   PaymentCompletedPayload,
 } from '../../shared/events';
 
-// ─── Models ───────────────────────────────────────────────
 interface Bill {
   id: string;
   orderId: string;
@@ -21,12 +17,10 @@ interface Bill {
   createdAt: string;
 }
 
-// ─── Repository ───────────────────────────────────────────
 class BillingRepository {
   constructor(private db: Pool) {}
 
   async createBill(orderId: string, tableId: string, totalAmount: number): Promise<Bill> {
-    // Idempotent: nếu bill cho order này đã tồn tại, trả về cái cũ
     const existing = await this.db.query(
       `SELECT id, order_id AS "orderId", table_id AS "tableId",
               total_amount AS "totalAmount", status, created_at AS "createdAt"
@@ -67,7 +61,6 @@ class BillingRepository {
     return rows[0] ?? null;
   }
 
-  // FIX: dùng đúng column name (table_id là VARCHAR, total_price từ orders)
   async getOrderInfo(orderId: string): Promise<{ totalPrice: number; tableId: string } | null> {
     const { rows } = await this.db.query(
       `SELECT total_price AS "totalPrice", table_id AS "tableId"
@@ -78,7 +71,6 @@ class BillingRepository {
   }
 }
 
-// ─── Service ──────────────────────────────────────────────
 class BillingService {
   constructor(
     private repo: BillingRepository,
@@ -105,7 +97,6 @@ class BillingService {
   }
 
   registerEventHandlers(): void {
-    // ORDER_COMPLETED → tạo bill sẵn cho thu ngân
     this.eventBus.subscribe(EVENTS.ORDER_COMPLETED, async (raw) => {
       const payload = raw as OrderCompletedPayload;
       console.log(`[Billing] ORDER_COMPLETED → creating bill for order ${payload.orderId}`);
@@ -120,7 +111,6 @@ class BillingService {
   }
 }
 
-// ─── Controller / Router ──────────────────────────────────
 export function registerBillingModule(db: Pool, eventBus: SimpleEventBus): Router {
   const router  = Router();
   const repo    = new BillingRepository(db);
@@ -128,7 +118,6 @@ export function registerBillingModule(db: Pool, eventBus: SimpleEventBus): Route
 
   service.registerEventHandlers();
 
-  // GET /billing/:tableId — casher, manager, admin
   router.get('/billing/:tableId',
     authenticate, authorize('casher', 'manager', 'admin'),
     async (req: Request, res: Response) => {
@@ -145,7 +134,6 @@ export function registerBillingModule(db: Pool, eventBus: SimpleEventBus): Route
     }
   );
 
-  // POST /billing/:billId/pay — casher, manager, admin
   router.post('/billing/:billId/pay',
     authenticate, authorize('casher', 'manager', 'admin'),
     async (req: Request, res: Response) => {

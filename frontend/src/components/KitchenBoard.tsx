@@ -1,8 +1,3 @@
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/components/KitchenBoard.tsx
-// Hiển thị danh sách ticket theo cột trạng thái
-// ────────────────────────────────────────────────────────────
 import { useKitchen } from '../hooks/useKitchen';
 
 export function KitchenBoard() {
@@ -18,7 +13,6 @@ export function KitchenBoard() {
 
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-            {/* Cột: Chờ nấu */}
             <div>
                 <h3 style={{ color: '#e67e22' }}>Chờ nấu ({pending.length})</h3>
                 {pending.map(t => (
@@ -39,7 +33,6 @@ export function KitchenBoard() {
                 ))}
             </div>
 
-            {/* Cột: Đang nấu */}
             <div>
                 <h3 style={{ color: '#27ae60' }}>Đang nấu ({cooking.length})</h3>
                 {cooking.map(t => (

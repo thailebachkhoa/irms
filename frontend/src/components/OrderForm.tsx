@@ -1,8 +1,3 @@
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/components/OrderForm.tsx
-// Form tạo đơn: chọn combo (từ MenuGrid) → nhập số bàn + ghi chú → submit
-// ────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { orderApi } from '../services/orderApi';
 import { MenuGrid } from './MenuGrid';
@@ -26,7 +21,6 @@ export function OrderForm() {
             };
             await orderApi.createOrder(dto);
             setStatus('success');
-            // reset form
             setSelected(null); setTableId(''); setQuantity(1); setNotes('');
             setTimeout(() => setStatus('idle'), 2000);
         } catch { setStatus('idle'); }
