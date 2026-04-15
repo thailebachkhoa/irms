@@ -1,4 +1,4 @@
-// frontend/src/services/billingApi.ts
+
 import { api } from './api';
 import type { Bill } from '../types';
 import type { AxiosResponse } from 'axios';

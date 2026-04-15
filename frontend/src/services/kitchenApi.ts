@@ -1,4 +1,3 @@
-// frontend/src/services/kitchenApi.ts
 
 import { api } from './api';
 import type { KitchenTicket } from '../types';

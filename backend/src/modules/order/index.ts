@@ -1,13 +1,9 @@
-// src/modules/order/index.ts
-// Module Order & Menu
-
 import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
 import { SimpleEventBus } from '../../infrastructure/eventBus';
 import { authenticate, authorize } from '../../infrastructure/auth';
 import { EVENTS, OrderCreatedPayload } from '../../shared/events';
 
-// ─── Models ───────────────────────────────────────────────
 interface MenuItem {
   id: string;
   name: string;
@@ -34,7 +30,6 @@ interface CreateOrderDto {
   notes: string;
 }
 
-// ─── Repository ───────────────────────────────────────────
 class MenuRepository {
   constructor(private db: Pool) {}
 
@@ -60,7 +55,6 @@ class MenuRepository {
     );
   }
 
-  // Đặt unavailable khi nguyên liệu thiếu (qua combo_dishes → dish_ingredients)
   async setUnavailableByIngredient(ingredientName: string): Promise<void> {
     await this.db.query(`
       UPDATE menu_items SET is_available = false
@@ -107,7 +101,6 @@ class OrderRepository {
   }
 }
 
-// ─── Service ──────────────────────────────────────────────
 class OrderService {
   constructor(
     private menuRepo: MenuRepository,
@@ -133,7 +126,7 @@ class OrderService {
     if (!combo.isAvailable) throw new Error(`Combo "${combo.name}" is not available`);
 
     const totalPrice = combo.price * dto.quantity;
-    const order      = await this.orderRepo.save(dto, combo.name, totalPrice);
+    const order = await this.orderRepo.save(dto, combo.name, totalPrice);
 
     const payload: OrderCreatedPayload = {
       orderId:    order.id,
@@ -153,7 +146,6 @@ class OrderService {
     return this.orderRepo.findByTable(tableId);
   }
 
-  // FIX: cập nhập status order → done khi kitchen xong
   registerEventHandlers(): void {
     this.eventBus.subscribe(EVENTS.RAW_MATERIAL_LOW, async (raw) => {
       const payload = raw as { ingredientName: string };
@@ -169,7 +161,6 @@ class OrderService {
   }
 }
 
-// ─── Controller / Router ──────────────────────────────────
 export function registerOrderModule(db: Pool, eventBus: SimpleEventBus): Router {
   const router    = Router();
   const menuRepo  = new MenuRepository(db);
@@ -178,7 +169,6 @@ export function registerOrderModule(db: Pool, eventBus: SimpleEventBus): Router 
 
   service.registerEventHandlers();
 
-  // GET /menu — tất cả đã đăng nhập
   router.get('/menu', authenticate, async (_req: Request, res: Response) => {
     try {
       res.json(await service.getMenu());
@@ -187,7 +177,6 @@ export function registerOrderModule(db: Pool, eventBus: SimpleEventBus): Router 
     }
   });
 
-  // PATCH /menu/:id/availability — admin, manager
   router.patch('/menu/:id/availability',
     authenticate, authorize('admin', 'manager'),
     async (req: Request, res: Response) => {
@@ -200,7 +189,6 @@ export function registerOrderModule(db: Pool, eventBus: SimpleEventBus): Router 
     }
   );
 
-  // POST /orders — server, manager, admin
   router.post('/orders',
     authenticate, authorize('server', 'manager', 'admin'),
     async (req: Request, res: Response) => {
@@ -213,7 +201,6 @@ export function registerOrderModule(db: Pool, eventBus: SimpleEventBus): Router 
     }
   );
 
-  // GET /orders/table/:tableId — server, casher, manager, admin
   router.get('/orders/table/:tableId',
     authenticate, authorize('server', 'casher', 'manager', 'admin'),
     async (req: Request, res: Response) => {

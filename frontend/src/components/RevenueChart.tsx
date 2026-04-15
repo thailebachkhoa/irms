@@ -1,8 +1,3 @@
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/components/RevenueChart.tsx
-// Manager xem doanh thu ngày hôm nay
-// ────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
 import { analyticsApi } from '../services/analyticsApi';
 

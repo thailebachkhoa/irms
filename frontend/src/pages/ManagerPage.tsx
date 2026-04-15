@@ -1,22 +1,19 @@
-
-// ────────────────────────────────────────────────────────────
-// frontend/src/pages/ManagerPage.tsx
-// Role: manager — bàn + kho + doanh thu (3 tab)
-// ────────────────────────────────────────────────────────────
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TableMap } from '../components/TableMap';
 import { RevenueChart } from '../components/RevenueChart';
-import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { Layout } from '../components/Layout';
 import { inventoryApi } from '../services/inventoryApi';
-import { useEffect } from 'react';
 import type { Ingredient } from '../types';
 
+const TABS = [
+  { key: 'tables', label: 'Sơ đồ bàn' },
+  { key: 'inventory', label: 'Kho nguyên liệu' },
+  { key: 'revenue', label: 'Doanh thu' },
+];
+
 export function ManagerPage() {
-    const [tab, setTab] = useState<'tables' | 'inventory' | 'revenue'>('tables');
+    const [tab, setTab] = useState('tables');
     const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-    const { logout } = useAuth();
-    const navigate = useNavigate();
 
     useEffect(() => {
         if (tab === 'inventory')
@@ -24,26 +21,7 @@ export function ManagerPage() {
     }, [tab]);
 
     return (
-        <div style={{ padding: 24, maxWidth: 1000, margin: '0 auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
-                <h1>Quản lý</h1>
-                <button onClick={() => { logout(); navigate('/login'); }}>Đăng xuất</button>
-            </div>
-
-            <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-                {(['tables', 'inventory', 'revenue'] as const).map(t => (
-                    <button key={t} onClick={() => setTab(t)}
-                        style={{
-                            padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                            background: tab === t ? '#2c3e50' : '#eee',
-                            color: tab === t ? '#fff' : '#333'
-                        }}
-                    >
-                        {t === 'tables' ? 'Sơ đồ bàn' : t === 'inventory' ? 'Kho nguyên liệu' : 'Doanh thu'}
-                    </button>
-                ))}
-            </div>
-
+        <Layout title="Quản lý" tabs={TABS} activeTab={tab} onTabChange={setTab}>
             {tab === 'tables' && <TableMap />}
             {tab === 'revenue' && <RevenueChart />}
             {tab === 'inventory' && (
@@ -77,6 +55,6 @@ export function ManagerPage() {
                     </tbody>
                 </table>
             )}
-        </div>
+        </Layout>
     );
 }

@@ -1,4 +1,4 @@
-// frontend/src/services/inventoryApi.ts
+
 import { api } from './api';
 import type { Ingredient } from '../types';
 import type { AxiosResponse } from 'axios';
