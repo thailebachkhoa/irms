@@ -1,3 +1,8 @@
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/router/AppRouter.tsx
+// Route guard: redirect về /login nếu chưa đăng nhập hoặc sai role
+// ────────────────────────────────────────────────────────────
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LoginPage } from '../pages/LoginPage';
@@ -8,6 +13,7 @@ import { ManagerPage } from '../pages/ManagerPage';
 import { AdminPage } from '../pages/AdminPage';
 import type { Role } from '../types';
 
+// HOC bảo vệ route — chỉ cho vào nếu có đúng role
 function Guard({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
     const { user } = useAuth();
     if (!user) return <Navigate to="/login" replace />;
@@ -47,6 +53,7 @@ export function AppRouter() {
                     </Guard>
                 } />
 
+                {/* Fallback */}
                 <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
         </BrowserRouter>

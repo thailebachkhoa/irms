@@ -1,10 +1,15 @@
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/components/TableMap.tsx
+// Hiển thị sơ đồ bàn với màu trạng thái
+// ────────────────────────────────────────────────────────────
 import { useTables } from '../hooks/useTables';
 import type { TableStatus } from '../types';
 
 const colorMap: Record<TableStatus, string> = {
-    available: '#27ae60',
-    occupied: '#e67e22',
-    food_ready: '#2980b9',
+    available: '#27ae60',  // xanh lá — trống
+    occupied: '#e67e22',  // cam     — có khách, đang nấu
+    food_ready: '#2980b9',  // xanh    — món đã ra, chờ dọn
 };
 const labelMap: Record<TableStatus, string> = {
     available: 'Trống',
@@ -17,6 +22,7 @@ export function TableMap() {
 
     return (
         <div>
+            {/* Legend */}
             <div style={{ display: 'flex', gap: 16, marginBottom: 16, fontSize: 13 }}>
                 {Object.entries(colorMap).map(([status, color]) => (
                     <span key={status} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -29,6 +35,7 @@ export function TableMap() {
                 ))}
             </div>
 
+            {/* Grid bàn */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
                 {tables.map(table => (
                     <div

@@ -1,9 +1,13 @@
+// src/modules/inventory/index.ts
+// Module Inventory — kho nguyên liệu
+
 import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
 import { SimpleEventBus } from '../../infrastructure/eventBus';
 import { authenticate, authorize } from '../../infrastructure/auth';
 import { EVENTS, OrderCreatedPayload, RawMaterialLowPayload } from '../../shared/events';
 
+// ─── Models ───────────────────────────────────────────────
 interface Ingredient {
   id: string;
   name: string;
@@ -12,6 +16,7 @@ interface Ingredient {
   threshold: number;
 }
 
+// ─── Repository ───────────────────────────────────────────
 class InventoryRepository {
   constructor(private db: Pool) {}
 
@@ -31,7 +36,10 @@ class InventoryRepository {
     return rows[0] ?? null;
   }
 
+  // Trừ nguyên liệu khi có ORDER_CREATED
+  // Lấy danh sách nguyên liệu cần cho combo (qua combo_dishes → dish_ingredients)
   async deductForCombo(comboId: string, comboQuantity: number): Promise<void> {
+    // Lấy tất cả nguyên liệu cần cho combo này
     const { rows } = await this.db.query(
       `SELECT di.ingredient_name, SUM(di.qty_needed * $2) AS total_needed
        FROM combo_dishes cd
@@ -51,6 +59,7 @@ class InventoryRepository {
     }
   }
 
+  // Tìm nguyên liệu dưới ngưỡng sau khi trừ
   async findBelowThreshold(): Promise<Ingredient[]> {
     const { rows } = await this.db.query(
       `SELECT id, name, quantity, unit, threshold
@@ -58,8 +67,18 @@ class InventoryRepository {
     );
     return rows;
   }
+
+  async findByName(name: string): Promise<Ingredient | null> {
+    const { rows } = await this.db.query(
+      `SELECT id, name, quantity, unit, threshold
+       FROM ingredients WHERE name = $1`,
+      [name]
+    );
+    return rows[0] ?? null;
+  }
 }
 
+// ─── Service ──────────────────────────────────────────────
 class InventoryService {
   constructor(
     private repo: InventoryRepository,
@@ -75,12 +94,14 @@ class InventoryService {
   }
 
   registerEventHandlers(): void {
+    // ORDER_CREATED → trừ kho, kiểm tra ngưỡng
     this.eventBus.subscribe(EVENTS.ORDER_CREATED, async (raw) => {
       const payload = raw as OrderCreatedPayload;
       console.log(`[Inventory] ORDER_CREATED → deducting for combo ${payload.comboId} x${payload.quantity}`);
 
       await this.repo.deductForCombo(payload.comboId, payload.quantity);
 
+      // Kiểm tra ngưỡng sau khi trừ
       const lowItems = await this.repo.findBelowThreshold();
       for (const item of lowItems) {
         const lowPayload: RawMaterialLowPayload = {
@@ -95,6 +116,7 @@ class InventoryService {
   }
 }
 
+// ─── Controller / Router ──────────────────────────────────
 export function registerInventoryModule(db: Pool, eventBus: SimpleEventBus): Router {
   const router  = Router();
   const repo    = new InventoryRepository(db);
@@ -102,6 +124,7 @@ export function registerInventoryModule(db: Pool, eventBus: SimpleEventBus): Rou
 
   service.registerEventHandlers();
 
+  // GET /inventory — manager, admin
   router.get('/inventory',
     authenticate, authorize('manager', 'admin'),
     async (_req: Request, res: Response) => {
@@ -113,6 +136,7 @@ export function registerInventoryModule(db: Pool, eventBus: SimpleEventBus): Rou
     }
   );
 
+  // PATCH /inventory/:name — manager, admin
   router.patch('/inventory/:name',
     authenticate, authorize('manager', 'admin'),
     async (req: Request, res: Response) => {

@@ -1,3 +1,7 @@
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/hooks/useBilling.ts
+// ────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { billingApi } from '../services/billingApi';
 import type { Bill } from '../types';

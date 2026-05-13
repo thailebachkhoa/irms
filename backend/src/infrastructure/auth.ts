@@ -1,3 +1,6 @@
+// src/infrastructure/auth.ts
+// JWT middleware + helper sign/verify
+
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
@@ -8,6 +11,7 @@ export interface AuthPayload {
   role: Role;
 }
 
+// Extend Express Request
 declare global {
   namespace Express {
     interface Request {
@@ -27,6 +31,7 @@ export function verifyToken(token: string): AuthPayload {
   return jwt.verify(token, SECRET) as AuthPayload;
 }
 
+// Middleware: xác thực JWT
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
@@ -41,6 +46,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
   }
 }
 
+// Middleware factory: kiểm tra role
 export function authorize(...roles: Role[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user || !roles.includes(req.user.role)) {

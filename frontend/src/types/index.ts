@@ -1,3 +1,9 @@
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/types/index.ts
+// Shared types dùng chung cho toàn FE
+// Mirror lại models của BE — không import trực tiếp từ BE
+// ────────────────────────────────────────────────────────────
 export type Role = 'admin' | 'manager' | 'server' | 'chef' | 'casher';
 
 export type OrderStatus  = 'pending' | 'cooking' | 'done';

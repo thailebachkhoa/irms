@@ -1,3 +1,8 @@
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/components/BillPanel.tsx
+// Thu ngân tìm hóa đơn theo bàn, xác nhận thanh toán
+// ────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { useBilling } from '../hooks/useBilling';
 
@@ -7,6 +12,7 @@ export function BillPanel() {
 
     return (
         <div style={{ maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Tìm hóa đơn */}
             <div style={{ display: 'flex', gap: 8 }}>
                 <input
                     placeholder="Số bàn..."
@@ -27,6 +33,7 @@ export function BillPanel() {
 
             {loading && <div>Đang tải...</div>}
 
+            {/* Hiển thị hóa đơn */}
             {bill && (
                 <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
                     <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 8 }}>

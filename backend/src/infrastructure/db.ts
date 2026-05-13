@@ -1,4 +1,8 @@
+// src/infrastructure/db.ts
+// PostgreSQL connection pool — singleton, dùng chung toàn app
 import { Pool } from 'pg';
+
+// Load .env thủ công (không dùng dotenv package)
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -23,7 +27,7 @@ export const pool = new Pool({
   database: process.env.DB_NAME     || 'irms',
   user:     process.env.DB_USER     || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
-  max: 20,
+  max: 20,          // max 20 connections — đủ cho peak hours
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });

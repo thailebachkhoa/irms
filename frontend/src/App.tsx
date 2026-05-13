@@ -1,3 +1,8 @@
+
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/App.tsx
+// ────────────────────────────────────────────────────────────
 import { AuthProvider } from './context/AuthContext';
 import { AppRouter } from './router/AppRouter';
 

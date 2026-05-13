@@ -1,9 +1,13 @@
+// src/modules/kitchen/index.ts
+// Module Kitchen Display System (KDS)
+
 import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
 import { SimpleEventBus } from '../../infrastructure/eventBus';
 import { authenticate, authorize } from '../../infrastructure/auth';
 import { EVENTS, OrderCreatedPayload, OrderCompletedPayload } from '../../shared/events';
 
+// ─── Models ───────────────────────────────────────────────
 interface KitchenTicket {
   id: string;
   orderId: string;
@@ -15,6 +19,7 @@ interface KitchenTicket {
   createdAt: string;
 }
 
+// ─── Repository ───────────────────────────────────────────
 class KitchenRepository {
   constructor(private db: Pool) {}
 
@@ -53,6 +58,7 @@ class KitchenRepository {
     return rows[0] ?? null;
   }
 
+  // FIX: đồng bộ status lên bảng orders
   async updateOrderStatus(orderId: string, status: 'cooking' | 'done'): Promise<void> {
     await this.db.query(
       `UPDATE orders SET status = $1 WHERE id = $2`,
@@ -61,6 +67,7 @@ class KitchenRepository {
   }
 }
 
+// ─── Service ──────────────────────────────────────────────
 class KitchenService {
   constructor(
     private repo: KitchenRepository,
@@ -74,7 +81,10 @@ class KitchenService {
   async startCooking(id: string): Promise<KitchenTicket> {
     const ticket = await this.repo.updateStatus(id, 'cooking');
     if (!ticket) throw new Error(`Ticket ${id} not found`);
+
+    // Đồng bộ trạng thái nấu lên orders
     await this.repo.updateOrderStatus(ticket.orderId, 'cooking');
+
     return ticket;
   }
 
@@ -82,6 +92,7 @@ class KitchenService {
     const ticket = await this.repo.updateStatus(id, 'done');
     if (!ticket) throw new Error(`Ticket ${id} not found`);
 
+    // Phát event ORDER_COMPLETED cho Table + Billing + Order
     const payload: OrderCompletedPayload = {
       orderId: ticket.orderId,
       tableId: ticket.tableId,
@@ -100,6 +111,7 @@ class KitchenService {
   }
 }
 
+// ─── Controller / Router ──────────────────────────────────
 export function registerKitchenModule(db: Pool, eventBus: SimpleEventBus): Router {
   const router  = Router();
   const repo    = new KitchenRepository(db);
@@ -107,6 +119,7 @@ export function registerKitchenModule(db: Pool, eventBus: SimpleEventBus): Route
 
   service.registerEventHandlers();
 
+  // GET /kitchen/tickets — chef, manager, admin
   router.get('/kitchen/tickets',
     authenticate, authorize('chef', 'manager', 'admin'),
     async (_req: Request, res: Response) => {
@@ -118,6 +131,7 @@ export function registerKitchenModule(db: Pool, eventBus: SimpleEventBus): Route
     }
   );
 
+  // PATCH /kitchen/:id/start — chef, manager, admin
   router.patch('/kitchen/:id/start',
     authenticate, authorize('chef', 'manager', 'admin'),
     async (req: Request, res: Response) => {
@@ -129,6 +143,7 @@ export function registerKitchenModule(db: Pool, eventBus: SimpleEventBus): Route
     }
   );
 
+  // PATCH /kitchen/:id/done — chef, manager, admin
   router.patch('/kitchen/:id/done',
     authenticate, authorize('chef', 'manager', 'admin'),
     async (req: Request, res: Response) => {

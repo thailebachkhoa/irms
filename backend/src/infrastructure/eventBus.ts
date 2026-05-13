@@ -1,3 +1,7 @@
+// src/infrastructure/eventBus.ts
+// In-process event bus — đủ dùng cho service-based architecture
+// Nếu scale lên microservices thì thay bằng Redis Pub/Sub hoặc RabbitMQ
+
 type Handler = (payload: unknown) => void | Promise<void>;
 
 export class SimpleEventBus {
@@ -18,6 +22,7 @@ export class SimpleEventBus {
       return;
     }
     console.log(`[EventBus] Publishing "${event}" to ${handlers.length} handler(s)`);
+    // Chạy song song tất cả handlers
     await Promise.allSettled(
       handlers.map(h =>
         Promise.resolve(h(payload)).catch(err =>

@@ -1,3 +1,8 @@
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/context/AuthContext.tsx
+// JWT decode + lưu token + cung cấp user info toàn app
+// ────────────────────────────────────────────────────────────
 import React, { createContext, useContext, useState } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import type { AuthPayload, Role } from '../types';

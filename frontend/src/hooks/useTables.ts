@@ -1,3 +1,9 @@
+
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/hooks/useTables.ts
+// Poll mỗi 3s — server xem sơ đồ bàn real-time
+// ────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import type { Table } from '../types';

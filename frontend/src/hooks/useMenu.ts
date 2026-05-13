@@ -1,3 +1,8 @@
+
+// ────────────────────────────────────────────────────────────
+// frontend/src/hooks/useMenu.ts
+// Fetch menu 1 lần khi mount, cung cấp cho MenuGrid + OrderForm
+// ────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
 import { orderApi } from '../services/orderApi';
 import type { MenuItem } from '../types';
