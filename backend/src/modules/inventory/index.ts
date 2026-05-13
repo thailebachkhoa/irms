@@ -37,9 +37,7 @@ class InventoryRepository {
   }
 
   // Trừ nguyên liệu khi có ORDER_CREATED
-  // Lấy danh sách nguyên liệu cần cho combo (qua combo_dishes → dish_ingredients)
   async deductForCombo(comboId: string, comboQuantity: number): Promise<void> {
-    // Lấy tất cả nguyên liệu cần cho combo này
     const { rows } = await this.db.query(
       `SELECT di.ingredient_name, SUM(di.qty_needed * $2) AS total_needed
        FROM combo_dishes cd
@@ -76,6 +74,34 @@ class InventoryRepository {
     );
     return rows[0] ?? null;
   }
+
+  /**
+   * Sau khi cập nhật nguyên liệu, duyệt toàn bộ combo đang is_available = false
+   * và bật lại những combo mà TẤT CẢ nguyên liệu đều vượt ngưỡng threshold.
+   *
+   * Logic SQL:
+   *  - Lấy tất cả combo đang bị tắt
+   *  - Với mỗi combo, kiểm tra xem có nguyên liệu nào còn <= threshold không
+   *  - Nếu không có → combo đủ hàng → bật lại is_available = true
+   */
+  async restoreAvailableCombo(): Promise<string[]> {
+    const { rows } = await this.db.query(`
+      UPDATE menu_items
+      SET is_available = true
+      WHERE is_available = false
+        AND id NOT IN (
+          -- Các combo vẫn còn ít nhất 1 nguyên liệu thiếu (quantity <= threshold)
+          SELECT DISTINCT cd.combo_id
+          FROM combo_dishes cd
+          JOIN dish_ingredients di ON di.dish_id = cd.dish_id
+          JOIN ingredients ing     ON ing.name    = di.ingredient_name
+          WHERE ing.quantity <= ing.threshold
+        )
+      RETURNING id, name
+    `);
+
+    return rows.map((r: { id: string; name: string }) => r.name);
+  }
 }
 
 // ─── Service ──────────────────────────────────────────────
@@ -89,8 +115,33 @@ class InventoryService {
     return this.repo.findAll();
   }
 
+  /**
+   * Cập nhật số lượng nguyên liệu, sau đó:
+   * 1. Bật lại combo nào vừa đủ nguyên liệu (quantity > threshold với mọi ingredient)
+   * 2. Kiểm tra lại ngưỡng — nếu vẫn còn thiếu thì phát RAW_MATERIAL_LOW
+   */
   async updateQuantity(name: string, quantity: number): Promise<Ingredient | null> {
-    return this.repo.updateQuantity(name, quantity);
+    const item = await this.repo.updateQuantity(name, quantity);
+    if (!item) return null;
+
+    // Bật lại combo đủ nguyên liệu
+    const restored = await this.repo.restoreAvailableCombo();
+    if (restored.length > 0) {
+      console.log(`[Inventory] Restored available combos: ${restored.join(', ')}`);
+    }
+
+    // Nếu nguyên liệu vừa cập nhật vẫn còn dưới ngưỡng → phát cảnh báo tiếp
+    if (item.quantity <= item.threshold) {
+      const lowPayload: RawMaterialLowPayload = {
+        ingredientName: item.name,
+        currentQty:     item.quantity,
+        threshold:      item.threshold,
+      };
+      console.warn(`[Inventory] Still LOW after update: ${item.name} = ${item.quantity} ${item.unit}`);
+      await this.eventBus.publish(EVENTS.RAW_MATERIAL_LOW, lowPayload);
+    }
+
+    return item;
   }
 
   registerEventHandlers(): void {

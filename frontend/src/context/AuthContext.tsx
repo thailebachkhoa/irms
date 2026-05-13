@@ -1,11 +1,37 @@
-
 // ────────────────────────────────────────────────────────────
 // frontend/src/context/AuthContext.tsx
 // JWT decode + lưu token + cung cấp user info toàn app
+//
+// FIX: dùng sessionStorage thay localStorage
+//   → mỗi tab/cửa sổ có session độc lập
+//   → nhiều nhân viên có thể đăng nhập cùng lúc trên các tab khác nhau
 // ────────────────────────────────────────────────────────────
 import React, { createContext, useContext, useState } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import type { AuthPayload, Role } from '../types';
+
+// KEY lưu token — dùng sessionStorage để cô lập theo tab
+const TOKEN_KEY = 'irms_token';
+
+function readToken(): string | null {
+    return sessionStorage.getItem(TOKEN_KEY);
+}
+
+function saveToken(token: string) {
+    sessionStorage.setItem(TOKEN_KEY, token);
+}
+
+function clearToken() {
+    sessionStorage.removeItem(TOKEN_KEY);
+}
+
+function decodeToken(token: string): AuthPayload | null {
+    try {
+        return jwtDecode<AuthPayload>(token);
+    } catch {
+        return null;
+    }
+}
 
 type AuthCtx = {
     user: AuthPayload | null;
@@ -18,22 +44,20 @@ type AuthCtx = {
 const AuthContext = createContext<AuthCtx>(null!);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [token, setToken] = useState<string | null>(
-        () => localStorage.getItem('irms_token')
-    );
+    const [token, setToken] = useState<string | null>(() => readToken());
     const [user, setUser] = useState<AuthPayload | null>(() => {
-        const t = localStorage.getItem('irms_token');
-        return t ? jwtDecode<AuthPayload>(t) : null;
+        const t = readToken();
+        return t ? decodeToken(t) : null;
     });
 
     const login = (newToken: string) => {
-        localStorage.setItem('irms_token', newToken);
+        saveToken(newToken);
         setToken(newToken);
-        setUser(jwtDecode<AuthPayload>(newToken));
+        setUser(decodeToken(newToken));
     };
 
     const logout = () => {
-        localStorage.removeItem('irms_token');
+        clearToken();
         setToken(null);
         setUser(null);
     };

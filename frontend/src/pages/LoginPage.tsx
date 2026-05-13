@@ -1,7 +1,8 @@
-
-// ────────────────────────────────────────────────────────────
 // frontend/src/pages/LoginPage.tsx
-// ────────────────────────────────────────────────────────────
+//
+// FIX: không cần đổi gì ở đây — AuthContext.login() đã xử lý sessionStorage
+//      Chỉ bỏ dòng jwtDecode thừa (login() trong AuthContext đã decode rồi)
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { analyticsApi } from '../services/analyticsApi';
@@ -13,10 +14,9 @@ export function LoginPage() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-    const { login, user } = useAuth();
+    const { login } = useAuth();
     const navigate = useNavigate();
 
-    // Role → trang mặc định sau khi đăng nhập
     const roleDefaultRoute: Record<string, string> = {
         server: '/server',
         chef: '/kitchen',
@@ -26,15 +26,17 @@ export function LoginPage() {
     };
 
     const submit = async () => {
+        setError('');
         try {
             const { token } = await analyticsApi.login(username, password);
-            const decoded = jwtDecode<AuthPayload>(token); // decode trước
-            login(token);                                   // gọi 1 lần
-            navigate(roleDefaultRoute[decoded.role] ?? '/login'); // navigate
+            // decode trước để lấy role cho navigate, sau đó gọi login() 1 lần
+            const decoded = jwtDecode<AuthPayload>(token);
+            login(token); // lưu vào sessionStorage của tab này
+            navigate(roleDefaultRoute[decoded.role] ?? '/login');
         } catch {
             setError('Sai tên đăng nhập hoặc mật khẩu');
         }
-    }
+    };
 
     return (
         <div style={{
@@ -47,14 +49,16 @@ export function LoginPage() {
             }}>
                 <h2 style={{ marginBottom: 24, textAlign: 'center' }}>IRMS</h2>
 
-                <input placeholder="Tên đăng nhập" value={username}
+                <input
+                    placeholder="Tên đăng nhập" value={username}
                     onChange={e => setUsername(e.target.value)}
                     style={{
                         width: '100%', padding: 10, marginBottom: 12,
                         borderRadius: 6, border: '1px solid #ddd', boxSizing: 'border-box'
                     }}
                 />
-                <input type="password" placeholder="Mật khẩu" value={password}
+                <input
+                    type="password" placeholder="Mật khẩu" value={password}
                     onChange={e => setPassword(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && submit()}
                     style={{
@@ -63,9 +67,14 @@ export function LoginPage() {
                     }}
                 />
 
-                {error && <div style={{ color: '#e74c3c', marginBottom: 12, fontSize: 14 }}>{error}</div>}
+                {error && (
+                    <div style={{ color: '#e74c3c', marginBottom: 12, fontSize: 14 }}>
+                        {error}
+                    </div>
+                )}
 
-                <button onClick={submit}
+                <button
+                    onClick={submit}
                     style={{
                         width: '100%', padding: 12, background: '#2c3e50',
                         color: '#fff', border: 'none', borderRadius: 8,

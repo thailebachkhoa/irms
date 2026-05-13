@@ -36,7 +36,7 @@ interface CreateOrderDto {
 
 // ─── Repository ───────────────────────────────────────────
 class MenuRepository {
-  constructor(private db: Pool) {}
+  constructor(private db: Pool) { }
 
   async findAll(): Promise<MenuItem[]> {
     const { rows } = await this.db.query(
@@ -75,7 +75,7 @@ class MenuRepository {
 }
 
 class OrderRepository {
-  constructor(private db: Pool) {}
+  constructor(private db: Pool) { }
 
   async save(dto: CreateOrderDto, comboName: string, totalPrice: number): Promise<Order> {
     const { rows } = await this.db.query(
@@ -113,7 +113,7 @@ class OrderService {
     private menuRepo: MenuRepository,
     private orderRepo: OrderRepository,
     private eventBus: SimpleEventBus
-  ) {}
+  ) { }
 
   async getMenu(): Promise<MenuItem[]> {
     return this.menuRepo.findAll();
@@ -127,21 +127,32 @@ class OrderService {
     if (!dto.tableId || !dto.comboId || !dto.quantity || dto.quantity < 1) {
       throw new Error('tableId, comboId, quantity (>=1) are required');
     }
+    // ── Thêm đoạn này ──────────────────────────────────────
+    const tableNum = parseInt(dto.tableId, 10);
+    if (
+      isNaN(tableNum) ||
+      tableNum < 1 ||
+      tableNum > 20 ||
+      !/^\d{3}$/.test(dto.tableId)   // đúng format 3 chữ số: 001-020
+    ) {
+      throw new Error('Số bàn không hợp lệ. Chỉ chấp nhận 001–020');
+    }
+    // ───────────────────────────────────────────────────────
 
     const combo = await this.menuRepo.findById(dto.comboId);
     if (!combo) throw new Error(`Combo ${dto.comboId} not found`);
     if (!combo.isAvailable) throw new Error(`Combo "${combo.name}" is not available`);
 
     const totalPrice = combo.price * dto.quantity;
-    const order      = await this.orderRepo.save(dto, combo.name, totalPrice);
+    const order = await this.orderRepo.save(dto, combo.name, totalPrice);
 
     const payload: OrderCreatedPayload = {
-      orderId:    order.id,
-      tableId:    order.tableId,
-      comboId:    order.comboId,
-      comboName:  order.comboName,
-      quantity:   order.quantity,
-      notes:      order.notes,
+      orderId: order.id,
+      tableId: order.tableId,
+      comboId: order.comboId,
+      comboName: order.comboName,
+      quantity: order.quantity,
+      notes: order.notes,
       totalPrice: order.totalPrice,
     };
     await this.eventBus.publish(EVENTS.ORDER_CREATED, payload);
@@ -171,10 +182,10 @@ class OrderService {
 
 // ─── Controller / Router ──────────────────────────────────
 export function registerOrderModule(db: Pool, eventBus: SimpleEventBus): Router {
-  const router    = Router();
-  const menuRepo  = new MenuRepository(db);
+  const router = Router();
+  const menuRepo = new MenuRepository(db);
   const orderRepo = new OrderRepository(db);
-  const service   = new OrderService(menuRepo, orderRepo, eventBus);
+  const service = new OrderService(menuRepo, orderRepo, eventBus);
 
   service.registerEventHandlers();
 

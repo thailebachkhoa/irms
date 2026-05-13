@@ -46,12 +46,18 @@ export function OrderForm() {
             )}
 
             <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                    placeholder="Số bàn (vd: 001)"
+                <select
                     value={tableId}
                     onChange={e => setTableId(e.target.value)}
                     style={{ flex: 1, padding: 8, borderRadius: 6, border: '1px solid #ddd' }}
-                />
+                >
+                    <option value="">-- Chọn bàn --</option>
+                    {Array.from({ length: 20 }, (_, i) =>
+                        String(i + 1).padStart(3, '0')
+                    ).map(n => (
+                        <option key={n} value={n}>Bàn {n}</option>
+                    ))}
+                </select>
                 <input
                     type="number" min={1} value={quantity}
                     onChange={e => setQuantity(Number(e.target.value))}

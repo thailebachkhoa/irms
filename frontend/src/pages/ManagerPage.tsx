@@ -50,7 +50,7 @@ export function ManagerPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                         <tr style={{ background: '#f5f5f5' }}>
-                            {['Nguyên liệu', 'Số lượng', 'Đơn vị', 'Ngưỡng cảnh báo'].map(h => (
+                            {['Nguyên liệu', 'Số lượng', 'Đơn vị', 'Ngưỡng cảnh báo', 'Cập nhật'].map(h => (
                                 <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500 }}>{h}</th>
                             ))}
                         </tr>
@@ -60,18 +60,67 @@ export function ManagerPage() {
                             <tr key={item.id}
                                 style={{
                                     borderTop: '1px solid #eee',
-                                    background: item.quantity < item.threshold ? '#fff3f3' : 'transparent'
+                                    background: Number(item.quantity) <= Number(item.threshold)
+                                        ? '#fff3f3' : 'transparent'
                                 }}>
                                 <td style={{ padding: '8px 12px' }}>{item.name}</td>
                                 <td style={{
                                     padding: '8px 12px',
-                                    color: item.quantity < item.threshold ? '#e74c3c' : 'inherit',
-                                    fontWeight: item.quantity < item.threshold ? 500 : 400
+                                    color: Number(item.quantity) <= Number(item.threshold)
+                                        ? '#e74c3c' : 'inherit',
+                                    fontWeight: Number(item.quantity) <= Number(item.threshold)
+                                        ? 500 : 400
                                 }}>
                                     {item.quantity}
+                                    {Number(item.quantity) <= Number(item.threshold)
+                                        && (
+                                            <span style={{ marginLeft: 6, fontSize: 12, color: '#e74c3c' }}>
+                                                ⚠ Sắp hết
+                                            </span>
+                                        )}
                                 </td>
                                 <td style={{ padding: '8px 12px' }}>{item.unit}</td>
                                 <td style={{ padding: '8px 12px', color: '#999' }}>{item.threshold}</td>
+
+                                {/* ── Cột cập nhật ── */}
+                                <td style={{ padding: '8px 12px' }}>
+                                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            defaultValue={item.quantity}
+                                            id={`qty-${item.name}`}
+                                            style={{
+                                                width: 80, padding: '4px 8px',
+                                                borderRadius: 6, border: '1px solid #ddd'
+                                            }}
+                                        />
+                                        <button
+                                            onClick={async () => {
+                                                const input = document.getElementById(`qty-${item.name}`) as HTMLInputElement;
+                                                const newQty = parseFloat(input.value);
+                                                if (isNaN(newQty) || newQty < 0) return;
+                                                try {
+                                                    await inventoryApi.updateQuantity(item.name, newQty);
+                                                    // Cập nhật lại list
+                                                    setIngredients(prev =>
+                                                        prev.map(i => i.name === item.name
+                                                            ? { ...i, quantity: newQty }
+                                                            : i
+                                                        )
+                                                    );
+                                                } catch (e) { console.error(e); }
+                                            }}
+                                            style={{
+                                                padding: '4px 10px', background: '#2c3e50',
+                                                color: '#fff', border: 'none',
+                                                borderRadius: 6, cursor: 'pointer', fontSize: 13
+                                            }}
+                                        >
+                                            Lưu
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
                         ))}
                     </tbody>
